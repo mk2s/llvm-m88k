@@ -130,6 +130,10 @@ clang_tablegen(BuiltinsX86_64.inc -gen-clang-builtins
   SOURCE BuiltinsX86_64.td
   TARGET ClangBuiltinsX86_64)
 
+clang_tablegen(BuiltinsM88k.inc -gen-clang-builtins
+  SOURCE BuiltinsM88k.td
+  TARGET ClangBuiltinsM88k)
+
 clang_tablegen(BuiltinTemplates.inc -gen-clang-builtin-templates
   SOURCE BuiltinTemplates.td
   TARGET ClangBuiltinTemplates)
