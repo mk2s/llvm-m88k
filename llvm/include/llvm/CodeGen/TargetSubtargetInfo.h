@@ -29,6 +29,7 @@
 namespace llvm {
 
 class APInt;
+class BURSInstructionSelector;
 class MachineFunction;
 class ScheduleDAGMutation;
 class CallLowering;
@@ -116,6 +117,10 @@ public:
   // to also specialize selectors by MachineFunction, which would let us be
   // aware of optsize/optnone and such.
   virtual InstructionSelector *getInstructionSelector() const {
+    return nullptr;
+  }
+
+  virtual BURSInstructionSelector *getBURSInstructionSelector() const {
     return nullptr;
   }
 
