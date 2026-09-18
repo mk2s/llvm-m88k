@@ -65,10 +65,11 @@ uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value,
     return HandlePCRelFixupValue(26);
 
   case M88k::FK_88K_HI:
+    // %hi16: the upper 16 bits of the (32-bit) target value.
+    return (Value >> 16) & 0xffff;
   case M88k::FK_88K_LO:
-    if (!CheckFixupInRange(0, maxUIntN(16)))
-      return 0;
-    return Value;
+    // %lo16: the lower 16 bits of the (32-bit) target value.
+    return Value & 0xffff;
 
   case M88k::FK_88K_NONE:
     return 0;
@@ -132,11 +133,15 @@ M88kMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
       // This table *must* be in same the order of fixup_* kinds in
       // M88kMCFixups.h.
       // name    offset bits flags
+      // The HI/LO fixups are emitted at byte offset 2 within the 4-byte
+      // instruction (see M88kMCCodeEmitter::getMachineOpValue), so their
+      // in-field bit offset is 0 -- the 16 value bits occupy that whole
+      // 2-byte slot.  DISP16/DISP26 are emitted at byte offset 0.
       {"FK_88K_NONE", 0, 32, 0},
       {"FK_88K_DISP16", 16, 16, 0},
       {"FK_88K_DISP26", 6, 26, 0},
-      {"FK_88K_HI", 16, 16, 0},
-      {"FK_88K_LO", 16, 16, 0}};
+      {"FK_88K_HI", 0, 16, 0},
+      {"FK_88K_LO", 0, 16, 0}};
 
   if (Kind < FirstTargetFixupKind)
     return MCAsmBackend::getFixupKindInfo(Kind);

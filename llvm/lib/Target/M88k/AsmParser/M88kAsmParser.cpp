@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/M88kInstPrinter.h"
+#include "MCTargetDesc/M88kMCExpr.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "MCTargetDesc/M88kTargetStreamer.h"
 #include "TargetInfo/M88kTargetInfo.h"
@@ -175,9 +176,16 @@ public:
     addExpr(Inst, getImm());
   }
 
+  // A symbolic 16-bit immediate: a relocation specifier such as
+  // %hi16(sym) / %lo16(sym), or any other non-constant expression that will
+  // be resolved by a relocation.  Plain constants are handled by isImm().
+  bool isSymbolic16() const {
+    return Kind == OpKind_Imm && Imm && !isa<MCConstantExpr>(Imm);
+  }
+
   bool isU5Imm() const { return isImm(0, 31); }
-  bool isU16Imm() const { return isImm(0, 65535); }
-  bool isS16Imm() const { return isImm(-32768, 32767); }
+  bool isU16Imm() const { return isImm(0, 65535) || isSymbolic16(); }
+  bool isS16Imm() const { return isImm(-32768, 32767) || isSymbolic16(); }
   bool isVec9() const { return isImm(0, 511); }
 
   bool isBFWidth() const { return isImm(0, 31); }
@@ -226,6 +234,12 @@ class M88kAsmParser : public MCTargetAsmParser {
                      bool RestoreOnFailure);
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
   bool parseScaledRegister(OperandVector &Operands);
+
+  // Parse a %hi16(...) / %lo16(...) relocation operand.  On entry the lexer
+  // is positioned on the identifier following the '%'.  Consumes the
+  // identifier, the parenthesised sub-expression, and pushes an immediate
+  // operand wrapping an M88kMCExpr.  Returns true on error.
+  bool parseRelocExpr(OperandVector &Operands, SMLoc PercentLoc);
 
   ParseStatus parseBFWidth(OperandVector &Operands);
   ParseStatus parseBFOffset(OperandVector &Operands);
@@ -404,8 +418,19 @@ bool M88kAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
   }
   assert(Result.isNoMatch() && "Unexpected match result");
 
-  // Check if it is a register.
+  // A '%' introduces either a register (%r2) or a relocation specifier
+  // (%hi16(sym) / %lo16(sym)).  Distinguish by peeking at the identifier.
   if (Lexer.is(AsmToken::Percent)) {
+    SMLoc PercentLoc = Parser.getTok().getLoc();
+    const AsmToken &Next = Lexer.peekTok();
+    if (Next.is(AsmToken::Identifier)) {
+      StringRef Id = Next.getIdentifier();
+      if (Id == "hi16" || Id == "lo16") {
+        Parser.Lex(); // Eat '%'.
+        return parseRelocExpr(Operands, PercentLoc);
+      }
+    }
+
     MCRegister RegNo;
     SMLoc StartLoc, EndLoc;
     if (parseRegister(RegNo, StartLoc, EndLoc, /*RestoreOnFailure=*/false))
@@ -414,8 +439,11 @@ bool M88kAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
     return false;
   }
 
-  // Could be immediate or address.
-  if (Lexer.is(AsmToken::Integer)) {
+  // Otherwise it is an immediate or address expression: an integer literal,
+  // a symbol reference, or a more complex constant expression.
+  if (Lexer.is(AsmToken::Integer) || Lexer.is(AsmToken::Identifier) ||
+      Lexer.is(AsmToken::Dot) || Lexer.is(AsmToken::Minus) ||
+      Lexer.is(AsmToken::Tilde) || Lexer.is(AsmToken::LParen)) {
     SMLoc StartLoc = Parser.getTok().getLoc();
     const MCExpr *Expr;
     if (Parser.parseExpression(Expr))
@@ -427,6 +455,36 @@ bool M88kAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
 
   // Failure.
   return true;
+}
+
+bool M88kAsmParser::parseRelocExpr(OperandVector &Operands, SMLoc PercentLoc) {
+  // On entry the lexer is on the "hi16"/"lo16" identifier.
+  StringRef Id = Parser.getTok().getIdentifier();
+  M88kMCExpr::VariantKind Kind = StringSwitch<M88kMCExpr::VariantKind>(Id)
+                                     .Case("hi16", M88kMCExpr::VK_ABS_HI)
+                                     .Case("lo16", M88kMCExpr::VK_ABS_LO)
+                                     .Default(M88kMCExpr::VK_None);
+  if (Kind == M88kMCExpr::VK_None)
+    return Error(PercentLoc, "unknown relocation specifier");
+  Parser.Lex(); // Eat the identifier.
+
+  if (Lexer.isNot(AsmToken::LParen))
+    return Error(Parser.getTok().getLoc(), "expected '(' after relocation "
+                                           "specifier");
+  Parser.Lex(); // Eat '('.
+
+  const MCExpr *SubExpr;
+  if (Parser.parseExpression(SubExpr))
+    return true;
+
+  if (Lexer.isNot(AsmToken::RParen))
+    return Error(Parser.getTok().getLoc(), "expected ')'");
+  SMLoc EndLoc = Parser.getTok().getLoc();
+  Parser.Lex(); // Eat ')'.
+
+  const MCExpr *Expr = M88kMCExpr::create(Kind, SubExpr, getContext());
+  Operands.push_back(M88kOperand::createImm(Expr, PercentLoc, EndLoc));
+  return false;
 }
 
 ParseStatus M88kAsmParser::parseBFWidth(OperandVector &Operands) {
