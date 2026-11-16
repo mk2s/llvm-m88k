@@ -225,6 +225,12 @@ static bool selectCopy(MachineInstr &I, const TargetInstrInfo &TII,
   if (Register::isPhysicalRegister(DstReg))
     return true;
 
+  // The destination already has a register class (e.g. the copy of an inline
+  // asm input); there is nothing to guess.
+  if (MRI.getRegClassOrNull(DstReg)) {
+    I.setDesc(TII.get(TargetOpcode::COPY));
+    return true;
+  }
   const TargetRegisterClass *RC = guessRegClass(DstReg, MRI, TRI, RBI);
 
   // No need to constrain SrcReg. It will get constrained when
@@ -917,9 +923,11 @@ bool M88kInstructionSelector::selectPtrMask(MachineInstr &I,
 
   Register MaskReg = I.getOperand(2).getReg();
   std::optional<int64_t> MaskVal = getIConstantVRegSExtVal(MaskReg, MRI);
-  // TODO: Implement arbitrary cases
-  if (!MaskVal || !isInt<32>(*MaskVal) || !isShiftedMask_64(*MaskVal))
-    return false;
+  if (!MaskVal || !isInt<32>(*MaskVal) || !isShiftedMask_64(*MaskVal)) {
+    // Arbitrary masks: a plain AND of the pointer with the mask.
+    I.setDesc(TII.get(M88k::ANDrr));
+    return constrainSelectedInstRegOperands(I, MRI, TII, TRI, RBI);
+  }
 
   uint32_t Mask = ~static_cast<uint32_t>(*MaskVal);
   I.setDesc(TII.get(M88k::CLRrwo));

@@ -179,7 +179,9 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .clampScalar(0, S32, S64);
   getActionDefinitionsBuilder({G_SREM, G_UREM})
       .lowerFor({S32})
-      .libcallFor({S64});
+      .libcallFor({S64})
+      .widenScalarToNextPow2(0, 32)
+      .clampScalar(0, S32, S64);
   // Lowering a 64 bit G_UMULH creates a 128 bit multiplication, and narrowing
   // that one creates a 64 bit G_UMULH again. Narrow it to 32 bit instead.
   getActionDefinitionsBuilder(G_UMULH)
@@ -249,7 +251,8 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder({G_FNEG, G_FABS, G_FCOPYSIGN}).lower();
   getActionDefinitionsBuilder(G_IS_FPCLASS).lower();
   getActionDefinitionsBuilder({G_FMINNUM, G_FMAXNUM, G_FMA, G_FREM, G_FFLOOR,
-                               G_FCEIL, G_INTRINSIC_TRUNC, G_INTRINSIC_ROUND})
+                               G_FCEIL, G_INTRINSIC_TRUNC, G_INTRINSIC_ROUND,
+                               G_INTRINSIC_ROUNDEVEN, G_FRINT, G_FNEARBYINT})
       .libcallFor({S32, S64});
   getActionDefinitionsBuilder(G_FPEXT).legalFor({{S64, S32}});
   getActionDefinitionsBuilder(G_FPTRUNC).legalFor({{S32, S64}});
@@ -581,4 +584,38 @@ bool M88kLegalizerInfo::legalizeCustom(
   }
 
   return true;
+}
+bool M88kLegalizerInfo::legalizeIntrinsic(LegalizerHelper &Helper,
+                                          MachineInstr &MI) const {
+  MachineIRBuilder &MIRBuilder = Helper.MIRBuilder;
+  MachineRegisterInfo &MRI = *MIRBuilder.getMRI();
+  MachineFunction &MF = MIRBuilder.getMF();
+  switch (cast<GIntrinsic>(MI).getIntrinsicID()) {
+  case Intrinsic::vacopy: {
+    // va_list is a struct of 3 words (see M88kABIInfo::EmitVAArg), so va_copy
+    // copies 12 bytes.
+    const LLT S32 = LLT::scalar(32);
+    const LLT P0 = LLT::pointer(0, 32);
+    Register Dst = MI.getOperand(1).getReg();
+    Register Src = MI.getOperand(2).getReg();
+    MIRBuilder.setInstrAndDebugLoc(MI);
+    for (unsigned Off = 0; Off < 12; Off += 4) {
+      auto OffReg = MIRBuilder.buildConstant(S32, Off);
+      auto SrcPtr = MIRBuilder.buildPtrAdd(P0, Src, OffReg);
+      auto DstPtr = MIRBuilder.buildPtrAdd(P0, Dst, OffReg);
+      auto *LdMMO = MF.getMachineMemOperand(MachinePointerInfo(),
+                                            MachineMemOperand::MOLoad, S32,
+                                            Align(4));
+      auto *StMMO = MF.getMachineMemOperand(MachinePointerInfo(),
+                                            MachineMemOperand::MOStore, S32,
+                                            Align(4));
+      auto Val = MIRBuilder.buildLoad(S32, SrcPtr, *LdMMO);
+      MIRBuilder.buildStore(Val, DstPtr, *StMMO);
+    }
+    MI.eraseFromParent();
+    return true;
+  }
+  default:
+    return true;
+  }
 }

@@ -50,6 +50,7 @@ M88kSubtarget::M88kSubtarget(const Triple &TT, const std::string &CPU,
       TLInfo(TM, *this), FrameLowering(*this) {
   // GlobalISEL
   CallLoweringInfo.reset(new M88kCallLowering(*getTargetLowering()));
+  InlineAsmLoweringInfo.reset(new InlineAsmLowering(getTargetLowering()));
   Legalizer.reset(new M88kLegalizerInfo(*this));
   auto *RBI = new M88kRegisterBankInfo(*getRegisterInfo());
   RegBankInfo.reset(RBI);
