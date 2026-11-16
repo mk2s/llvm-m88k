@@ -13,7 +13,7 @@ BSP (crt0, linker script, console, ELF->COFF, MAME runner) is in `../m88k-bareme
    then `elf2ncd.py` writes `out/val.coff`.
 5. `./build.sh run`      runs MAME headless-captured (serial channel B to a TCP listener), saves
    `out/val.png` and diffs the serial output against `val.expected`.
-Environment: `LLVM`, `PICOLIBC`, `M88K_CPU` (default `mc88100`; 88110 is not supported yet), `JOBS`
+Environment: `LLVM`, `PICOLIBC`, `M88K_CPU` (default `mc88100`; 88110 is not supported yet), `FPX=1` (link the SFU1 FP exception handler), `JOBS`
 (default 2), `CAP` (memory-cap wrapper; set `CAP=` to disable).
 
 ## Rules
@@ -25,7 +25,8 @@ runner started is killed. No threads.
 mc88100 FP instructions (fadd/fmul/fdiv/flt/trnc/fcmp) are implemented in the MAME model (softfloat),
 and `val.c` executes them (hard-float code, `fmul.ddd`, `fdiv.ddd`, ...). MAME does not model FP
 exceptions or reserved operands (denormals, NaN, infinity), so it is more permissive than real
-silicon. Edge cases on a real unit would need an SFU1 exception handler.
+silicon. Edge cases on a real unit need the SFU1 exception handler (`FPX=1 ./build.sh prog`, see
+`../m88k-baremetal/ncd19c/README.md`).
 
 ## Real hardware
 Back up `~/Documents/mame/tftpboot/0A000207`, then `cp ../m88k-baremetal/ncd19c/out/val.coff` over it,
