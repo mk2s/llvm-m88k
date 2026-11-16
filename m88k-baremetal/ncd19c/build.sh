@@ -1,21 +1,31 @@
 #!/bin/bash
-# Usage: build.sh NAME|FILE.c   (builds tests/NAME.c or FILE.c -> out/NAME.elf, out/NAME.coff)
-# Tests named libc-* or val* link against picolibc (PICOLIBC, default
+# Usage: build.sh [--fpx] NAME|FILE.c   (builds tests/NAME.c or FILE.c -> out/NAME.elf, out/NAME.coff)
+# Tests named libc-*, val* or fpx-real link against picolibc (PICOLIBC, default
 # /home/mk2s/Documents/picolibc/install-m88k) and the compiler-rt builtins.
+# --fpx links the SFU1 FP exception handler (ncd19c_fpx.[Sc]); tests named fpx-* always do.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LLVM="${LLVM:-/home/mk2s/Documents/llvm-m88k}"
 CPU="${M88K_CPU:-mc88100}"
 CC="$LLVM/build/bin/clang --target=m88k-unknown-none-elf -mcpu=$CPU"
 CFLAGS="-O2 -ffreestanding -fno-unwind-tables -fno-asynchronous-unwind-tables -ffunction-sections -fdata-sections -fno-crash-diagnostics"
-NAME="${1:?usage: build.sh NAME|FILE.c}"
+FPX=0
+if [ "${1:-}" = "--fpx" ]; then FPX=1; shift; fi
+NAME="${1:?usage: build.sh [--fpx] NAME|FILE.c}"
 SRC="$HERE/tests/$NAME.c"
 case "$NAME" in *.c) SRC="$(cd "$(dirname "$NAME")" && pwd)/$(basename "$NAME")"; NAME="$(basename "$NAME" .c)";; esac
 OUT="$HERE/out"; mkdir -p "$OUT"
 $CC $CFLAGS -c "$HERE/crt0.S" -o "$OUT/crt0.o"
 $CC $CFLAGS -c "$HERE/ncd19c_console.c" -o "$OUT/ncd19c_console.o"
 LIBC=0
-case "$NAME" in libc-*|val*) LIBC=1;; esac
+case "$NAME" in libc-*|val*|fpx-real) LIBC=1;; esac
+case "$NAME" in fpx-*) FPX=1;; esac
+FPXOBJ=""
+if [ "$FPX" = 1 ]; then
+  $CC $CFLAGS -I"$HERE" -c "$HERE/ncd19c_fpx.S" -o "$OUT/ncd19c_fpx_s.o"
+  $CC $CFLAGS -I"$HERE" -c "$HERE/ncd19c_fpx.c" -o "$OUT/ncd19c_fpx_c.o"
+  FPXOBJ="$OUT/ncd19c_fpx_s.o $OUT/ncd19c_fpx_c.o"
+fi
 if [ "$LIBC" = 1 ]; then
   PICOLIBC="${PICOLIBC:-/home/mk2s/Documents/picolibc/install-m88k}"
   $CC $CFLAGS -isystem "$PICOLIBC/include" -I"$HERE" -c "$HERE/ncd19c_stdio.c" -o "$OUT/ncd19c_stdio.o"
@@ -30,5 +40,5 @@ fi
 # compiler-rt builtins (64 bit mul/div/rem, int <-> FP conversions, ...).
 RTLIB="$($CC -rtlib=compiler-rt -print-libgcc-file-name)"
 $LLVM/build/bin/ld.lld -T "$HERE/ncd19c.ld" --gc-sections -o "$OUT/$NAME.elf" \
-  "$OUT/crt0.o" "$OUT/ncd19c_console.o" $EXTRA "$OUT/$NAME.o" $LIBS "$RTLIB"
+  "$OUT/crt0.o" "$OUT/ncd19c_console.o" $FPXOBJ $EXTRA "$OUT/$NAME.o" $LIBS "$RTLIB"
 python3 "$HERE/elf2ncd.py" "$OUT/$NAME.elf" "$OUT/$NAME.coff"

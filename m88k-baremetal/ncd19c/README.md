@@ -55,3 +55,33 @@ console option.
   `__stack_size` 0x20000. Override with `--defsym`. Real unit has 2 MB data RAM at 0x08000000;
   MAME ncd19c has 8 MB data and 4 MB code.
 - The boot ROM accepts only .text, .data, .bss sections.
+## SFU1 floating-point exception handler (optional, `--fpx`)
+A real MC88100 does not finish FP instructions with reserved operands (denormal, NaN, infinity),
+division by zero or integer-conversion overflow. It takes a precise SFU1 exception (vector 114,
+VBR+$390). Result underflow/overflow/inexact take an imprecise one (vector 115, VBR+$398).
+The ROM's own handler is not known to emulate these.
+`ncd19c_fpx.{S,c,h}` patch the two vector slots (VBR = 0x04004000, read with `ldcr`) with a `br`
+to stubs that save r1-r31 and the FP control registers, restart the FPU (rte to a trap-not-taken,
+manual 6.4.3.4), call `ncd_fpx_handle`, write everything back and `rte`. The C part completes
+fadd/fsub/fmul/fdiv/fcmp/flt/int/nint/trnc with compiler-rt soft-float and applies the IEEE
+default action for underflow, overflow and inexact. `crt0.S` calls `ncd_fpx_install` before `main`
+and `ncd_fpx_uninstall` in `_exit` through weak references, so images without the handler are
+unchanged (the original vector words are restored on exit).
+    ./build.sh --fpx val.c ...   # or any test named fpx-*; baremetal/: FPX=1 ./build.sh prog
+Limits: user exception handlers (FPCR enable bits) are not dispatched, only the default action is
+taken. Emulated precise arithmetic rounds to nearest even. The inexact flag is not tracked for
+emulated precise operations. An exception during the FPU restart ends in `ncd_fpx_fatal` (message
+and return to the monitor). Writing the vector words does not flush any code cache, which is
+unverified on the real unit.
+Tests (all in `tests/`):
+- `fpx-unit.c`: calls `ncd_fpx_handle` with synthetic frames from the manual's encodings and prints
+  the destination registers, FPSR and FPECR. `fpx-unit.expected` comes from the host (`cc -DHOST`).
+  Run: `./run-ncd19c.py out/fpx-unit.coff` and compare with the expected file.
+- `fpx-dispatch.c`: installs the handler, executes `tb0 0,%r0,114` and `tb0 0,%r0,115` in
+  supervisor mode, checks r1-r31 and the call counts, uninstalls and checks the vector words.
+  Output must equal `fpx-dispatch.expected`.
+- `fpx-real.c`: **not verified in MAME.** For the real unit: build it, then
+  `cp out/fpx-real.coff ~/Documents/mame/tftpboot/0A000207` (back up the old file first), power-cycle
+  and compare screen/AUX output with `fpx-real.expected`. MAME never raises these exceptions and
+  also gets NaN compares wrong (lines `inf-inf class` and `nan cmp` differ in MAME), so the
+  exception path can only be checked on hardware.

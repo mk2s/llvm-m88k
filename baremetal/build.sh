@@ -2,7 +2,7 @@
 # End-to-end bare-metal m88k (NCD 19c) build and MAME run.
 # Usage: build.sh [clang|rt|picolibc|prog|run|all]   (default: all)
 # Env: LLVM, PICOLIBC (checkout, branch m88k), M88K_CPU (default mc88100),
-#      JOBS (default 2), CAP (memory-cap wrapper, default /home/mk2s/bin/capped if present).
+#      FPX=1 (link the SFU1 FP exception handler into val), JOBS (default 2), CAP (memory-cap wrapper, default /home/mk2s/bin/capped if present).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LLVM="${LLVM:-/home/mk2s/Documents/llvm-m88k}"
@@ -47,7 +47,7 @@ step_picolibc() { # 3. picolibc (branch m88k), installed to $PICO/install-m88k
   $CAP ninja -C "$PICO/build-m88k" -j"$JOBS" install
 }
 step_prog() {    # 4. build the validation program -> BSP out/val.coff
-  PICOLIBC="$PICO/install-m88k" M88K_CPU="$CPU" LLVM="$LLVM" $CAP "$BSP/build.sh" "$HERE/val.c"
+  PICOLIBC="$PICO/install-m88k" M88K_CPU="$CPU" LLVM="$LLVM" $CAP "$BSP/build.sh" ${FPX:+--fpx} "$HERE/val.c"
 }
 step_run() {     # 5. run in MAME (-window is hard-coded in the runner), compare with val.expected
   "$BSP/run-ncd19c.py" "$BSP/out/val.coff" --shot "$BSP/out/val.png" > "$BSP/out/val.serial"

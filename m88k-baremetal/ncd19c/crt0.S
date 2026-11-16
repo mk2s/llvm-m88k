@@ -3,6 +3,8 @@
 	.section .text.ncdhdr,"ax"
 	.globl	_start
 	.weak	__libc_init_array
+	.weak	ncd_fpx_install
+	.weak	ncd_fpx_uninstall
 	or	%r0, %r0, %r0
 	or	%r0, %r0, %r0
 	br	_start
@@ -34,13 +36,23 @@ _start:
 	or	%r12, %r12, %lo16(__libc_init_array)
 	bcnd	eq0, %r12, 3f
 	jsr	%r12
-3:	or	%r2, %r0, 0
+3:	/* images linked with ncd19c_fpx.[Sc] patch the SFU1 vectors (otherwise the weak symbol is 0) */
+	or.u	%r12, %r0, %hi16(ncd_fpx_install)
+	or	%r12, %r12, %lo16(ncd_fpx_install)
+	bcnd	eq0, %r12, 4f
+	jsr	%r12
+4:	or	%r2, %r0, 0
 	or	%r3, %r0, 0
 	bsr	main
 	bsr	_exit
 
 	.globl	_exit
 _exit:
+	or.u	%r12, %r0, %hi16(ncd_fpx_uninstall)
+	or	%r12, %r12, %lo16(ncd_fpx_uninstall)
+	bcnd	eq0, %r12, 5f
+	jsr	%r12
+5:
 	/* signal end of run (EOT) on the DUART, then return to the monitor */
 	or.u	%r13, %r0, 0x0100
 1:	ld.bu	%r12, %r13, 0x24
