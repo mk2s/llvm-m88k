@@ -1,0 +1,3 @@
+   text	   data	    bss	    dec	    hex	filename
+1423148	  67136	  84448	1574732	 18074c	/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC/netbsd
+1422972	  67136	  84448	1574556	 18069c	/tmp/nb/GENERIC_GCC/netbsd
