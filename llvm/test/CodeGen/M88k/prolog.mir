@@ -107,7 +107,7 @@ body:             |
     ; CHECK-NEXT: STriw killed renamable $r7, renamable $r2, 16 :: (store (s32) into %ir.arrayidx8, !tbaa !6)
     ; CHECK-NEXT: STriw $r0, renamable $r2, 20 :: (store (s32) into %ir.count_lo, !tbaa !10)
     ; CHECK-NEXT: STriw $r0, killed renamable $r2, 24 :: (store (s32) into %ir.count_hi, !tbaa !12)
-    ; CHECK-NEXT: $r30 = LDriw $r31, 0 :: (load (s32) from %stack.0, align 16)
+    ; CHECK-NEXT: $r30 = frame-destroy LDriw $r31, 0 :: (load (s32) from %stack.0, align 16)
     ; CHECK-NEXT: $r31 = frame-destroy ADDUri $r31, 16
     ; CHECK-NEXT: RET
     renamable $r3 = ORriu $r0, 26437

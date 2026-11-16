@@ -911,6 +911,13 @@ let isReturn = 1, isTerminator = 1, isBarrier = 1, Opcode = "RET" in {
   def RET : Pseudo<(outs), (ins), []>;
 }
 
+// Dynamic stack allocation, expanded in M88kFrameLowering after the size of
+// the outgoing argument area is known.
+let Defs = [R31], Uses = [R31], hasSideEffects = 1, mayLoad = 0,
+    mayStore = 0 in {
+  def DYNALLOC : Pseudo<(outs GPROpnd:$dst), (ins GPROpnd:$size), []>;
+}
+
 let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
   def BR : F_BRANCH<0b11000, (ins brtarget26:$d26), "br",
                     [(br bb:$d26)]>;

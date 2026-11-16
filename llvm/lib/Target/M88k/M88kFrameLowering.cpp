@@ -17,6 +17,7 @@
 #include "M88kSubtarget.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
@@ -25,6 +26,7 @@
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/Support/Alignment.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Target/TargetMachine.h"
 #include <algorithm>
@@ -212,6 +214,24 @@ bool M88kFrameLowering::spillCalleeSavedRegisters(
   return true;
 }
 
+bool M88kFrameLowering::restoreCalleeSavedRegisters(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
+    MutableArrayRef<CalleeSavedInfo> CSI, const TargetRegisterInfo *TRI) const {
+  MachineFunction *MF = MBB.getParent();
+  const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
+
+  // Restore in the normal TargetInstrInfo way, but flag the loads so that
+  // emitEpilogue can insert the stack pointer reset before them.
+  for (auto &CS : llvm::reverse(CSI)) {
+    Register Reg = CS.getReg();
+    const TargetRegisterClass *RC = TRI->getMinimalPhysRegClass(Reg);
+    TII->loadRegFromStackSlot(MBB, MBBI, Reg, CS.getFrameIdx(), RC, TRI,
+                              Register());
+    std::prev(MBBI)->setFlag(MachineInstr::FrameDestroy);
+  }
+  return true;
+}
+
 void M88kFrameLowering::emitPrologue(MachineFunction &MF,
                                      MachineBasicBlock &MBB) const {
   assert(&MF.front() == &MBB && "Shrink-wrapping not yet supported");
@@ -284,6 +304,39 @@ void M88kFrameLowering::emitEpilogue(MachineFunction &MF,
 
   unsigned StackSize = MFI.getStackSize();
 
+  // The stack pointer was changed by dynamic stack allocations. Restore it
+  // from the frame pointer before the callee-saved registers are reloaded,
+  // because the reloads are addressed relative to the stack pointer.
+  if (StackSize && MFI.hasVarSizedObjects()) {
+    M88kMachineFunctionInfo *FuncInfo = MF.getInfo<M88kMachineFunctionInfo>();
+    int64_t Offset =
+        StackSize + MFI.getObjectOffset(FuncInfo->getFramePointerIndex());
+    assert(Offset >= 0 && "Unexpected frame pointer offset");
+    MachineBasicBlock::iterator InsertPt = MBBI;
+    while (InsertPt != MBB.begin() &&
+           std::prev(InsertPt)->getFlag(MachineInstr::FrameDestroy))
+      --InsertPt;
+    if (isUInt<16>(Offset)) {
+      BuildMI(MBB, InsertPt, DL, LII.get(M88k::SUBUri), M88k::R31)
+          .addReg(M88k::R30)
+          .addImm(Offset)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    } else {
+      BuildMI(MBB, InsertPt, DL, LII.get(M88k::ORriu), M88k::R10)
+          .addReg(M88k::R0)
+          .addImm(Offset >> 16)
+          .setMIFlag(MachineInstr::FrameDestroy);
+      BuildMI(MBB, InsertPt, DL, LII.get(M88k::ORri), M88k::R10)
+          .addReg(M88k::R10)
+          .addImm(Offset & 0xFFFF)
+          .setMIFlag(MachineInstr::FrameDestroy);
+      BuildMI(MBB, InsertPt, DL, LII.get(M88k::SUBUrr), M88k::R31)
+          .addReg(M88k::R30)
+          .addReg(M88k::R10, RegState::Kill)
+          .setMIFlag(MachineInstr::FrameDestroy);
+    }
+  }
+
   if (StackSize) {
     if (isInt<16>(StackSize)) {
       // Restore %r31: add %r31, %r31, StackSize
@@ -311,7 +364,45 @@ void M88kFrameLowering::processFunctionBeforeFrameIndicesReplaced(
     MachineFunction &MF, RegScavenger *RS) const {
   M88kMachineFunctionInfo *FuncInfo = MF.getInfo<M88kMachineFunctionInfo>();
   MachineFrameInfo &MFI = MF.getFrameInfo();
+  const M88kInstrInfo &LII = *STI.getInstrInfo();
   std::vector<CalleeSavedInfo> &CSI = MFI.getCalleeSavedInfo();
+
+  // Expand the dynamic stack allocations now that the size of the outgoing
+  // argument area is known. The new stack pointer must keep the outgoing
+  // argument area below the allocated space, so:
+  //   dst = (size + 15) & ~15
+  //   sp  = sp - dst
+  //   dst = sp               ; result lies directly below the old sp
+  //   sp  = sp - ArgArea     ; new outgoing argument area
+  unsigned ArgArea = alignTo(MFI.getMaxCallFrameSize(), 16);
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &MI : llvm::make_early_inc_range(MBB)) {
+      if (MI.getOpcode() != M88k::DYNALLOC)
+        continue;
+      if (!isUInt<16>(ArgArea))
+        report_fatal_error("outgoing argument area too large for dynamic "
+                           "stack allocation");
+      DebugLoc DL = MI.getDebugLoc();
+      Register Dst = MI.getOperand(0).getReg();
+      Register Size = MI.getOperand(1).getReg();
+      BuildMI(MBB, MI, DL, LII.get(M88k::ADDUri), Dst).addReg(Size).addImm(15);
+      BuildMI(MBB, MI, DL, LII.get(M88k::CLRrwo), Dst)
+          .addReg(Dst)
+          .addImm(4)
+          .addImm(0);
+      BuildMI(MBB, MI, DL, LII.get(M88k::SUBUrr), M88k::R31)
+          .addReg(M88k::R31)
+          .addReg(Dst);
+      BuildMI(MBB, MI, DL, LII.get(M88k::ORrr), Dst)
+          .addReg(M88k::R31)
+          .addReg(M88k::R0);
+      if (ArgArea)
+        BuildMI(MBB, MI, DL, LII.get(M88k::SUBUri), M88k::R31)
+            .addReg(M88k::R31)
+            .addImm(ArgArea);
+      MI.eraseFromParent();
+    }
+  }
 
   // Adjust offset of spill slot of the return address register. Due to the
   // alignment of the spill slot of the previous frame register, there may be a
