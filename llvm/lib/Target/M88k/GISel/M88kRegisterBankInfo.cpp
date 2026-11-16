@@ -127,9 +127,13 @@ M88kRegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
         getOperandsMapping({getValueMapping(RBIdx), getValueMapping(PMI_GR32)});
     break;
   }
-  case TargetOpcode::G_TRUNC:
-    OperandsMapping = getValueMapping(PMI_GR32);
+  case TargetOpcode::G_TRUNC: {
+    LLT SrcTy = MRI.getType(MI.getOperand(1).getReg());
+    OperandsMapping = getOperandsMapping(
+        {getValueMapping(PMI_GR32),
+         getValueMapping(SrcTy.getSizeInBits() == 64 ? PMI_GR64 : PMI_GR32)});
     break;
+  }
   case TargetOpcode::G_SEXT:
   case TargetOpcode::G_ZEXT:
   case TargetOpcode::G_ANYEXT:
@@ -161,6 +165,16 @@ M88kRegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
                                           getValueMapping(PMI_GR32),
                                           getValueMapping(PMI_GR32)});
     break;
+  case TargetOpcode::G_FCMP: {
+    LLT Ty = MRI.getType(MI.getOperand(2).getReg());
+    if (Ty.getSizeInBits() != 64 && Ty.getSizeInBits() != 32)
+      return getInvalidInstructionMapping(); // TODO Support 80 bit FP.
+    PartialMappingIdx RBIdx = (Ty.getSizeInBits() == 64) ? PMI_GR64 : PMI_GR32;
+    OperandsMapping =
+        getOperandsMapping({getValueMapping(PMI_GR32), nullptr,
+                            getValueMapping(RBIdx), getValueMapping(RBIdx)});
+    break;
+  }
   case TargetOpcode::G_SELECT:
     // TODO FP not handled.
     OperandsMapping = getOperandsMapping(

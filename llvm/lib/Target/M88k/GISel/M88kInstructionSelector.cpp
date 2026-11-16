@@ -99,6 +99,13 @@ private:
                        MachineRegisterInfo &MRI) const;
   bool selectICmp(MachineInstr &I, MachineBasicBlock &MBB,
                   MachineRegisterInfo &MRI) const;
+  bool selectFCmp(MachineInstr &I, MachineBasicBlock &MBB,
+                  MachineRegisterInfo &MRI) const;
+  MachineInstr *emitFCmp(MachineInstr &I, MachineBasicBlock &MBB,
+                         MachineRegisterInfo &MRI, Register Dst, Register LHS,
+                         Register RHS) const;
+  bool selectTrunc(MachineInstr &I, MachineBasicBlock &MBB,
+                   MachineRegisterInfo &MRI) const;
   bool selectBrCond(MachineInstr &I, MachineBasicBlock &MBB,
                     MachineRegisterInfo &MRI) const;
   bool selectJumpTable(MachineInstr &I, MachineBasicBlock &MBB,
@@ -498,7 +505,9 @@ bool M88kInstructionSelector::selectSExtInreg(MachineInstr &I,
 
   // For G_SEXT_INREG, the width is the immediate in operand 2. The offset is
   // always 0.
-  Width = I.getOperand(2).getImm() + 1;
+  // The immediate of G_SEXT_INREG is the number of bits to sign-extend, which
+  // is also the width of the ext bit field.
+  Width = I.getOperand(2).getImm();
   assert(Width < 32 && "Can't sign-extend 32bit value");
 
   I.setDesc(TII.get(M88k::EXTrwo));
@@ -563,8 +572,10 @@ enum class CC0 : unsigned {
 static CC0 getCCforBCOND(CmpInst::Predicate Pred) {
   switch (Pred) {
   case CmpInst::ICMP_EQ:
+  case CmpInst::ICMP_ULE: // x <=u 0 iff x == 0
     return CC0::EQ0;
   case CmpInst::ICMP_NE:
+  case CmpInst::ICMP_UGT: // x >u 0 iff x != 0
     return CC0::NE0;
   case CmpInst::ICMP_SGT:
     return CC0::GT0;
@@ -617,6 +628,135 @@ bool M88kInstructionSelector::selectICmp(MachineInstr &I,
   return constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI);
 }
 
+// Returns the bit of the MC88100 fcmp result which holds the value of the
+// predicate. The fcmp result bits are (MC88100 User's Manual, fcmp):
+// 0 nc (not comparable), 1 cp (comparable), 2 eq, 3 ne, 4 gt, 5 le, 6 lt,
+// 7 ge. For unordered operands only nc is set, so bits 2-7 hold the ordered
+// predicates, and an unordered predicate is the complement of the opposite
+// ordered predicate. Invert is set in that case.
+// Note: a real MC88100 raises an SFU1 reserved-operand exception for NaN
+// operands, which the exception handler must emulate.
+static unsigned getBitForFCMP(CmpInst::Predicate Pred, bool &Invert) {
+  Invert = false;
+  switch (Pred) {
+  case CmpInst::FCMP_UNO:
+    return 0;
+  case CmpInst::FCMP_ORD:
+    return 1;
+  case CmpInst::FCMP_OEQ:
+    return 2;
+  case CmpInst::FCMP_ONE:
+    return 3;
+  case CmpInst::FCMP_OGT:
+    return 4;
+  case CmpInst::FCMP_OLE:
+    return 5;
+  case CmpInst::FCMP_OLT:
+    return 6;
+  case CmpInst::FCMP_OGE:
+    return 7;
+  default:
+    break;
+  }
+  Invert = true;
+  switch (Pred) {
+  case CmpInst::FCMP_UNE: // !oeq
+    return 2;
+  case CmpInst::FCMP_UEQ: // !one
+    return 3;
+  case CmpInst::FCMP_ULE: // !ogt
+    return 4;
+  case CmpInst::FCMP_UGT: // !ole
+    return 5;
+  case CmpInst::FCMP_UGE: // !olt
+    return 6;
+  case CmpInst::FCMP_ULT: // !oge
+    return 7;
+  default:
+    llvm_unreachable("Unexpected predicate");
+  }
+}
+
+MachineInstr *M88kInstructionSelector::emitFCmp(MachineInstr &I,
+                                                MachineBasicBlock &MBB,
+                                                MachineRegisterInfo &MRI,
+                                                Register Dst, Register LHS,
+                                                Register RHS) const {
+  unsigned Size = MRI.getType(LHS).getSizeInBits();
+  if (Size != MRI.getType(RHS).getSizeInBits() || (Size != 32 && Size != 64))
+    return nullptr;
+  return BuildMI(MBB, I, I.getDebugLoc(),
+                 TII.get(Size == 32 ? M88k::FCMPgsss : M88k::FCMPgsdd))
+      .addReg(Dst, RegState::Define)
+      .addReg(LHS)
+      .addReg(RHS);
+}
+
+bool M88kInstructionSelector::selectFCmp(MachineInstr &I,
+                                         MachineBasicBlock &MBB,
+                                         MachineRegisterInfo &MRI) const {
+  assert(I.getOpcode() == TargetOpcode::G_FCMP && "Unexpected G code");
+  MachineInstr *MI = nullptr;
+  CmpInst::Predicate Pred =
+      static_cast<CmpInst::Predicate>(I.getOperand(1).getPredicate());
+  Register DstReg = I.getOperand(0).getReg();
+  if (Pred == CmpInst::FCMP_FALSE || Pred == CmpInst::FCMP_TRUE) {
+    MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ORri), DstReg)
+             .addReg(M88k::R0)
+             .addImm(Pred == CmpInst::FCMP_TRUE ? 1 : 0);
+    I.eraseFromParent();
+    return constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI);
+  }
+  bool Invert;
+  unsigned Bit = getBitForFCMP(Pred, Invert);
+  Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
+  MI = emitFCmp(I, MBB, MRI, Temp, I.getOperand(2).getReg(),
+                I.getOperand(3).getReg());
+  if (!MI || !constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+    return false;
+  Register ExtDst =
+      Invert ? MRI.createVirtualRegister(&M88k::GPRRegClass) : DstReg;
+  MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::EXTUrwo), ExtDst)
+           .addReg(Temp, RegState::Kill)
+           .addImm(1)
+           .addImm(Bit);
+  if (Invert) {
+    if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+      return false;
+    MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::XORri), DstReg)
+             .addReg(ExtDst, RegState::Kill)
+             .addImm(1);
+  }
+  I.eraseFromParent();
+  return constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI);
+}
+
+// A boolean (s1) lives in bit 0 of a general purpose register; the other bits
+// are undefined. Truncating a 32 bit value to s1 is therefore a plain copy.
+bool M88kInstructionSelector::selectTrunc(MachineInstr &I,
+                                          MachineBasicBlock &MBB,
+                                          MachineRegisterInfo &MRI) const {
+  assert(I.getOpcode() == TargetOpcode::G_TRUNC && "Unexpected G code");
+  Register SrcReg = I.getOperand(1).getReg();
+  Register DstReg = I.getOperand(0).getReg();
+  unsigned SrcSize = MRI.getType(SrcReg).getSizeInBits();
+  if (SrcSize == 64 && MRI.getType(DstReg).getSizeInBits() <= 32) {
+    // The low word of a 64 bit value is in the sub_lo register.
+    if (!RBI.constrainGenericRegister(SrcReg, M88k::GPR64RegClass, MRI) ||
+        !RBI.constrainGenericRegister(DstReg, M88k::GPRRegClass, MRI))
+      return false;
+    BuildMI(MBB, I, I.getDebugLoc(), TII.get(TargetOpcode::COPY), DstReg)
+        .addReg(SrcReg, 0, M88k::sub_lo);
+    I.eraseFromParent();
+    return true;
+  }
+  if (SrcSize != 32)
+    return false;
+  if (!RBI.constrainGenericRegister(SrcReg, M88k::GPRRegClass, MRI))
+    return false;
+  return selectCopy(I, TII, MRI, TRI, RBI);
+}
+
 bool M88kInstructionSelector::selectBrCond(MachineInstr &I,
                                            MachineBasicBlock &MBB,
                                            MachineRegisterInfo &MRI) const {
@@ -634,7 +774,10 @@ bool M88kInstructionSelector::selectBrCond(MachineInstr &I,
   int64_t UImm16;
   if (mi_match(CC, MRI, m_GICmp(m_Pred(Pred), m_Reg(LHS), m_ICst(UImm16))) &&
       isUInt<16>(UImm16)) {
-    if (UImm16 == 0) {
+    // bcnd only tests against zero with signed conditions. The unsigned
+    // predicates uge/ult against zero are handled by the cmp/bb1 path below.
+    if (UImm16 == 0 && Pred != CmpInst::ICMP_UGE &&
+        Pred != CmpInst::ICMP_ULT) {
       CC0 CCCode = getCCforBCOND(Pred);
       MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::BCND))
                .addImm(static_cast<int64_t>(CCCode))
@@ -654,6 +797,20 @@ bool M88kInstructionSelector::selectBrCond(MachineInstr &I,
                .addReg(Temp, RegState::Kill)
                .addMBB(BB);
     }
+  } else if (mi_match(CC, MRI,
+                      m_GFCmp(m_Pred(Pred), m_Reg(LHS), m_Reg(RHS))) &&
+             Pred != CmpInst::FCMP_FALSE && Pred != CmpInst::FCMP_TRUE) {
+    bool Invert;
+    unsigned Bit = getBitForFCMP(Pred, Invert);
+    Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
+    MI = emitFCmp(I, MBB, MRI, Temp, LHS, RHS);
+    if (!MI || !constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+      return false;
+    MI = BuildMI(MBB, I, I.getDebugLoc(),
+                 TII.get(Invert ? M88k::BB0 : M88k::BB1))
+             .addImm(Bit)
+             .addReg(Temp, RegState::Kill)
+             .addMBB(BB);
   } else if (mi_match(CC, MRI, m_GICmp(m_Pred(Pred), m_Reg(LHS), m_Reg(RHS)))) {
     Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
     ICC CCCode = getCCforICMP(Pred);
@@ -815,11 +972,29 @@ bool M88kInstructionSelector::selectAddSubWithCarry(MachineInstr &I,
       }
     }
     if (SetCarry) {
-      Register DeadReg = MRI.createVirtualRegister(&M88k::GPRRegClass);
+      // Set the carry flag from bit 0 of the carry-in register. The generic
+      // carry-in is a carry for an add and a borrow for a subtract, while the
+      // hardware carry flag of a subtract is the inverted borrow. Move bit 0
+      // to bit 31, then
+      //  - add: t + t sets the carry flag to bit 31 of t.
+      //  - sub: 0 - t sets the carry flag to "no borrow", i.e. !bit 31 of t.
+      Register Bit31Reg = MRI.createVirtualRegister(&M88k::GPRRegClass);
       MachineInstr *MI =
-          BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::SUBUrrco), DeadReg)
-              .addReg(M88k::R0)
-              .addReg(CarryInMI->getCarryInReg());
+          BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::MAKrwo), Bit31Reg)
+              .addReg(CarryInMI->getCarryInReg())
+              .addImm(1)
+              .addImm(31);
+      if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+        return false;
+      Register DeadReg = MRI.createVirtualRegister(&M88k::GPRRegClass);
+      if (CarryInMI->isSub())
+        MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::SUBUrrco), DeadReg)
+                 .addReg(M88k::R0)
+                 .addReg(Bit31Reg);
+      else
+        MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ADDUrrco), DeadReg)
+                 .addReg(Bit31Reg)
+                 .addReg(Bit31Reg);
       if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
         return false;
     }
@@ -857,10 +1032,15 @@ bool M88kInstructionSelector::selectAddSubWithCarry(MachineInstr &I,
       // the carry flag directly.
       if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
         return false;
-      MI =
-          BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ADDUrrci), CarryOutReg)
-              .addReg(M88k::R0)
-              .addReg(M88k::R0);
+      // Copy the carry flag into bit 0 of the register. For a subtract, the
+      // generic carry-out is the borrow, which is the inverted hardware carry
+      // flag: 0 - 0 - borrow = 0 + ~0 + carry is -1 for a borrow and 0
+      // otherwise.
+      MI = BuildMI(MBB, I, I.getDebugLoc(),
+                   TII.get(IsSub ? M88k::SUBUrrci : M88k::ADDUrrci),
+                   CarryOutReg)
+               .addReg(M88k::R0)
+               .addReg(M88k::R0);
     }
   }
   I.eraseFromParent();
@@ -946,7 +1126,7 @@ bool M88kInstructionSelector::selectExt(MachineInstr &I, MachineBasicBlock &MBB,
   int64_t SImm16;
   if (mi_match(SrcReg, MRI,
                m_GICmp(m_Pred(Pred), m_Reg(LHS), m_ICst(SImm16))) &&
-      isInt<16>(SImm16)) {
+      isUInt<16>(SImm16)) {
     Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
     ICC CCCode = getCCforICMP(Pred);
     MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::CMPri))
@@ -973,6 +1153,17 @@ bool M88kInstructionSelector::selectExt(MachineInstr &I, MachineBasicBlock &MBB,
              .addReg(Temp, RegState::Kill)
              .addImm(1)
              .addImm(int64_t(CCCode));
+  } else if (MRI.getType(I.getOperand(1).getReg()) == LLT::scalar(1)) {
+    // Only bit 0 of a boolean is defined.
+    Register Src = I.getOperand(1).getReg();
+    if (!RBI.constrainGenericRegister(Src, M88k::GPRRegClass, MRI))
+      return false;
+    if (I.getOpcode() == TargetOpcode::G_ANYEXT)
+      return selectCopy(I, TII, MRI, TRI, RBI);
+    MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(NewOpc), DstReg)
+             .addReg(Src)
+             .addImm(1)
+             .addImm(0);
   } else
     return false;
 
@@ -1117,7 +1308,8 @@ bool M88kInstructionSelector::preISelLower(MachineInstr &I) {
     Register DstReg = I.getOperand(0).getReg();
     Register AddOp1Reg = I.getOperand(1).getReg();
 
-    auto PtrToInt = BuildMI(MBB, I.getPrevNode(), I.getDebugLoc(),
+    // Insert directly before I. I may be the first instruction of the block.
+    auto PtrToInt = BuildMI(MBB, I, I.getDebugLoc(),
                             TII.get(TargetOpcode::G_PTRTOINT),
                             MRI.createVirtualRegister(&M88k::GPRRegClass))
                         .addReg(AddOp1Reg);
@@ -1231,6 +1423,16 @@ bool M88kInstructionSelector::select(MachineInstr &I) {
     return selectSExtInreg(I, MBB, MRI);
   case TargetOpcode::G_ICMP:
     return selectICmp(I, MBB, MRI);
+  case TargetOpcode::G_FCMP:
+    return selectFCmp(I, MBB, MRI);
+  case TargetOpcode::G_IMPLICIT_DEF: {
+    I.setDesc(TII.get(TargetOpcode::IMPLICIT_DEF));
+    Register DstReg = I.getOperand(0).getReg();
+    const TargetRegisterClass *RC = guessRegClass(DstReg, MRI, TRI, RBI);
+    return RBI.constrainGenericRegister(DstReg, *RC, MRI);
+  }
+  case TargetOpcode::G_TRUNC:
+    return selectTrunc(I, MBB, MRI);
   case TargetOpcode::G_BRCOND:
     return selectBrCond(I, MBB, MRI);
   case TargetOpcode::G_JUMP_TABLE:

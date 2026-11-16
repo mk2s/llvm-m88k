@@ -49,10 +49,8 @@ define float @negate1(float %a) {
 define double @negate2(double %a) {
 ; CHECK-LABEL: negate2:
 ; CHECK:       | %bb.0:
-; CHECK-NEXT:    xor %r3, %r3, 0
 ; CHECK-NEXT:    xor.u %r2, %r2, 32768
 ; CHECK-NEXT:    jmp %r1
-; BUG!!! r3 is zero'ed - why?
   %neg = fneg double %a
   ret double %neg
 }

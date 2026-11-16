@@ -504,11 +504,16 @@ bool M88kPostLegalizerLoweringImpl::tryCombineAll(MachineInstr &MI) const {
         Opc == TargetOpcode::G_UADDO || Opc == TargetOpcode::G_USUBO ||
         Opc == TargetOpcode::G_UADDE || Opc == TargetOpcode::G_USUBE;
     unsigned SrcIdx = HasCarry ? 2 : 1;
-    unsigned SrcOpc =
-        getDefIgnoringCopies(MI.getOperand(SrcIdx).getReg(), *B.getMRI())
-            ->getOpcode();
-    if (SrcOpc == TargetOpcode::G_CONSTANT ||
-        SrcOpc == TargetOpcode::G_FCONSTANT) {
+    auto IsConst = [&](unsigned Idx) {
+      unsigned Opc =
+          getDefIgnoringCopies(MI.getOperand(Idx).getReg(), *B.getMRI())
+              ->getOpcode();
+      return Opc == TargetOpcode::G_CONSTANT ||
+             Opc == TargetOpcode::G_FCONSTANT;
+    };
+    // Do not swap if both operands are constants. That would swap them back
+    // and forth forever.
+    if (IsConst(SrcIdx) && !IsConst(SrcIdx + 1)) {
       Observer.changingInstr(MI);
       B.getTII().commuteInstruction(MI, false, SrcIdx, SrcIdx + 1);
       Observer.changedInstr(MI);

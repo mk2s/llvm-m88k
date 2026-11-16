@@ -91,10 +91,19 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
 
   getActionDefinitionsBuilder({G_SEXT, G_ZEXT, G_ANYEXT})
       .legalFor({{S32, S16}, {S32, S8}, {S32, S1}})
+      // Extend small values to s64 via s32. The generic narrowing of e.g.
+      // s1 -> s64 creates a merge of s1 values, which can't be legalized.
+      .customIf([=](const LegalityQuery &Query) {
+        return Query.Types[0] == S64 && Query.Types[1].isScalar() &&
+               Query.Types[1].getSizeInBits() < 32;
+      })
       .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32)
       .widenScalarToNextPow2(1, 32);
-  getActionDefinitionsBuilder(G_SEXT_INREG).legalForTypeWithAnyImm({S32});
+  getActionDefinitionsBuilder(G_SEXT_INREG)
+      .legalForTypeWithAnyImm({S32})
+      .widenScalarToNextPow2(0, 32)
+      .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_TRUNC).alwaysLegal();
   getActionDefinitionsBuilder({G_SEXTLOAD, G_ZEXTLOAD})
       .legalForTypesWithMemDesc({{S32, P0, S8, 8}, {S32, P0, S16, 16}})
@@ -171,14 +180,20 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder({G_SREM, G_UREM})
       .lowerFor({S32})
       .libcallFor({S64});
-  getActionDefinitionsBuilder({G_UMULH, G_SMULH}).lower();
+  // Lowering a 64 bit G_UMULH creates a 128 bit multiplication, and narrowing
+  // that one creates a 64 bit G_UMULH again. Narrow it to 32 bit instead.
+  getActionDefinitionsBuilder(G_UMULH)
+      .lowerFor({S32})
+      .clampScalar(0, S32, S32);
+  getActionDefinitionsBuilder(G_SMULH).lower();
   getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
       .legalFor({S32})
       .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
+  // The pre-legalizer combiner may form bitfield extracts of any width.
   getActionDefinitionsBuilder({G_SBFX, G_UBFX})
       .legalFor({{S32, S32}})
-      .clampScalar(0, S32, S32);
+      .custom();
   getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
       .legalFor({{S32, S32}})
       .clampScalar(1, S32, S32)
@@ -187,10 +202,25 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder(G_ROTR).legalFor({{S32}, {S32}});
   getActionDefinitionsBuilder({G_ROTL, G_FSHL, G_FSHR}).lower();
   getActionDefinitionsBuilder(G_CTLZ)
-    .customFor({{S32}, {S32}});
+      .customFor({{S32, S32}})
+      .clampScalar(1, S32, S32)
+      .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_CTLZ_ZERO_UNDEF)
-      .legalFor({{S32}, {S32}});
-  getActionDefinitionsBuilder({G_CTTZ, G_CTTZ_ZERO_UNDEF, G_CTPOP}).lower();
+      .legalFor({{S32, S32}})
+      .clampScalar(1, S32, S32)
+      .clampScalar(0, S32, S32);
+  getActionDefinitionsBuilder({G_CTTZ, G_CTTZ_ZERO_UNDEF, G_CTPOP})
+      .clampScalar(1, S32, S32)
+      .clampScalar(0, S32, S32)
+      .lower();
+  getActionDefinitionsBuilder({G_BSWAP, G_BITREVERSE})
+      .widenScalarToNextPow2(0, 32)
+      .clampScalar(0, S32, S32)
+      .lower();
+  getActionDefinitionsBuilder(G_ABS).lower();
+  getActionDefinitionsBuilder({G_UMULO, G_SMULO}).lower();
+  getActionDefinitionsBuilder({G_SADDSAT, G_UADDSAT, G_SSUBSAT, G_USUBSAT})
+      .lower();
   getActionDefinitionsBuilder({G_SMAX, G_UMAX, G_SMIN, G_UMIN}).lower();
 
   getActionDefinitionsBuilder({G_MEMCPY, G_MEMMOVE, G_MEMSET}).libcall();
@@ -199,6 +229,10 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .legalForCartesianProduct({S1}, {S32, P0})
       .widenScalarToNextPow2(1, 32)
       .clampScalar(1, S32, S32);
+  // The MC88100 fcmp instruction compares single and double precision values
+  // in general purpose registers.
+  getActionDefinitionsBuilder(G_FCMP)
+      .legalForCartesianProduct({S1}, {S32, S64});
   getActionDefinitionsBuilder(G_BRCOND).legalFor({S1});
   getActionDefinitionsBuilder(G_BRJT).legalFor({{P0, S32}});
   getActionDefinitionsBuilder(G_BRINDIRECT).legalFor({P0});
@@ -212,7 +246,11 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder({G_FADD, G_FSUB, G_FMUL, G_FDIV})
       .legalFor({S32, S64})
       .legalIf(all(typeInSet(0, {S80}), IsMC88110));
-  getActionDefinitionsBuilder({G_FNEG, G_FABS}).lower();
+  getActionDefinitionsBuilder({G_FNEG, G_FABS, G_FCOPYSIGN}).lower();
+  getActionDefinitionsBuilder(G_IS_FPCLASS).lower();
+  getActionDefinitionsBuilder({G_FMINNUM, G_FMAXNUM, G_FMA, G_FREM, G_FFLOOR,
+                               G_FCEIL, G_INTRINSIC_TRUNC, G_INTRINSIC_ROUND})
+      .libcallFor({S32, S64});
   getActionDefinitionsBuilder(G_FPEXT).legalFor({{S64, S32}});
   getActionDefinitionsBuilder(G_FPTRUNC).legalFor({{S32, S64}});
 
@@ -242,7 +280,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .libcallForCartesianProduct({S64, S32}, {S64})
       .minScalar(1, S32);
   getActionDefinitionsBuilder(G_UITOFP)
-      //.libcallForCartesianProduct({S64, S32}, {S64})
+      .libcallForCartesianProduct({S64, S32}, {S64})
       // It is not really legal - it will be lowered later.
       .legalForCartesianProduct({S64, S32}, {S32})
       .minScalar(1, S32);
@@ -385,6 +423,48 @@ bool M88kLegalizerInfo::legalizeCustom(
     MI.eraseFromParent();
     break;
   }
+  case G_SEXT:
+  case G_ZEXT:
+  case G_ANYEXT: {
+    // Extend to s32 for the low part, and build the high part directly. An
+    // extend of an extend would be folded back by the artifact combiner.
+    auto Lo = MIRBuilder.buildInstr(MI.getOpcode(), {S32},
+                                    {MI.getOperand(1).getReg()});
+    Register Hi;
+    if (MI.getOpcode() == G_SEXT)
+      Hi = MIRBuilder.buildAShr(S32, Lo, MIRBuilder.buildConstant(S32, 31))
+               .getReg(0);
+    else if (MI.getOpcode() == G_ZEXT)
+      Hi = MIRBuilder.buildConstant(S32, 0).getReg(0);
+    else
+      Hi = MIRBuilder.buildUndef(S32).getReg(0);
+    MIRBuilder.buildMergeLikeInstr(MI.getOperand(0).getReg(),
+                                   {Lo.getReg(0), Hi});
+    MI.eraseFromParent();
+    break;
+  }
+  case G_SBFX:
+  case G_UBFX: {
+    // Lower a bitfield extract which is not 32 bit wide to
+    //   Dst = G_[AL]SHR (G_SHL Src, Size - Offset - Width), Size - Width
+    // There is no generic lowering for G_[SU]BFX.
+    Register Dst = MI.getOperand(0).getReg();
+    Register Src = MI.getOperand(1).getReg();
+    Register Off = MI.getOperand(2).getReg();
+    Register Width = MI.getOperand(3).getReg();
+    LLT Ty = MRI.getType(Dst);
+    LLT AmtTy = MRI.getType(Off);
+    auto Size = MIRBuilder.buildConstant(AmtTy, Ty.getSizeInBits());
+    auto RShAmt = MIRBuilder.buildSub(AmtTy, Size, Width);
+    auto LShAmt = MIRBuilder.buildSub(AmtTy, RShAmt, Off);
+    auto Shl = MIRBuilder.buildShl(Ty, Src, LShAmt);
+    if (MI.getOpcode() == G_SBFX)
+      MIRBuilder.buildAShr(Dst, Shl, RShAmt);
+    else
+      MIRBuilder.buildLShr(Dst, Shl, RShAmt);
+    MI.eraseFromParent();
+    break;
+  }
   case G_FCONSTANT: {
     LLVMContext &Ctx = MIRBuilder.getMF().getFunction().getContext();
     // Convert to integer constants, while preserving the binary representation.
@@ -472,28 +552,27 @@ bool M88kLegalizerInfo::legalizeCustom(
     break;
   }
   case G_CTLZ: {
-    // The instruction
-    //   %7:_(s32) = G_CTLZ %0(s32)
-    // is lowered to:
+    // ff1 returns the bit number of the most significant set bit, or 32 if
+    // no bit is set. For 0 <= ff1 <= 31, ctlz = 31 - ff1 = ff1 ^ 31. For
+    // ff1 = 32 (bit 5 set), ff1 ^ 31 = 63, and xoring bit 5 sign-extended and
+    // masked to 31 gives 32:
     //   %1:_(s32) = G_INTRINSIC intrinsic(@llvm.m88k.ff1), %0(s32)
-    //   %2:_(s32) = G_CONSTANT i32 31
-    //   %3:_(s32) = G_CONSTANT i32 0
-    //   %4:_(s32), %3:_(s32) = G_USUBO %2, %1
-    //   %5:_(s32) = G_AND %2, %4
-    //   %6:_(s32), %3:_(s32) = G_UADDE %5, %3, %4
+    //   %2:_(s32) = G_XOR %1, 31
+    //   %3:_(s32) = G_SBFX %1, 5, 1
+    //   %4:_(s32) = G_AND %3, 31
+    //   %5:_(s32) = G_XOR %2, %4
+    // A sequence with G_USUBO/G_UADDE does not work: the carry flag of a
+    // subtract is the inverted borrow on the M88k.
     Register Dst = MI.getOperand(0).getReg();
-
     auto FF1 =
         MIRBuilder.buildIntrinsic(Intrinsic::m88k_ff1, {S32}, false, false);
     FF1.addUse(MI.getOperand(1).getReg());
-    Register USub = MRI.createGenericVirtualRegister(S32);
-    Register Carry = MRI.createGenericVirtualRegister(S32);
-    Register Dead = MRI.createGenericVirtualRegister(S32);
     auto Const31 = MIRBuilder.buildConstant(S32, 31);
-    auto Const0 = MIRBuilder.buildConstant(S32, 0);
-    MIRBuilder.buildUSubo(USub, Carry, Const31, FF1);
-    auto And = MIRBuilder.buildAnd(S32, USub, Const31);
-    MIRBuilder.buildUAdde(Dst, Dead, And, Const0, Carry);
+    auto Xor = MIRBuilder.buildXor(S32, FF1, Const31);
+    auto Bit5 = MIRBuilder.buildSbfx(S32, FF1, MIRBuilder.buildConstant(S32, 5),
+                                     MIRBuilder.buildConstant(S32, 1));
+    auto Mask = MIRBuilder.buildAnd(S32, Bit5, Const31);
+    MIRBuilder.buildXor(Dst, Xor, Mask);
     MI.eraseFromParent();
     break;
   }
