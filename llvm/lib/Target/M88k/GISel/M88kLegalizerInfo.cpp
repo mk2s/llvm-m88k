@@ -275,7 +275,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
 
   getActionDefinitionsBuilder(G_FPTOUI)
       .libcallForCartesianProduct({S64}, {S64, S32})
-      .lowerForCartesianProduct({S32}, {S64, S32})
+      .customForCartesianProduct({S32}, {S64, S32})
       .minScalar(0, S32);
 
   // Int to FP conversion instructions
@@ -304,6 +304,41 @@ bool M88kLegalizerInfo::legalizeCustom(
   const LLT P0 = LLT::pointer(0, 32);
 
   switch (MI.getOpcode()) {
+  case G_FPTOUI: {
+    // trnc raises an SFU1 precise exception for out-of-range input, so never
+    // convert a value >= 2^31. For 2^31 <= x < 2^32 subtract 2^31 first
+    // (exact), convert, and flip the top bit. The generic lowering executes
+    // trnc on both x and x - 2^31, which traps on real hardware.
+    Register Dst = MI.getOperand(0).getReg();
+    Register Src = MI.getOperand(1).getReg();
+    if (MRI.getType(Dst) != S32)
+      return false;
+    LLT SrcTy = MRI.getType(Src);
+    bool IsDouble = SrcTy == S64;
+
+    auto Two31 = MIRBuilder.buildFConstant(SrcTy, 2147483648.0);
+    auto Cmp = MIRBuilder.buildFCmp(CmpInst::FCMP_OGE, LLT::scalar(1), Src,
+                                    Two31);
+    auto Mask = MIRBuilder.buildSExt(S32, Cmp);
+    Register Sub;
+    if (IsDouble) {
+      auto Zero = MIRBuilder.buildConstant(S32, 0);
+      auto Hi = MIRBuilder.buildAnd(
+          S32, Mask, MIRBuilder.buildConstant(S32, 0x41e00000));
+      Sub = MIRBuilder.buildMergeLikeInstr(S64, {Zero, Hi}).getReg(0);
+    } else {
+      Sub = MIRBuilder
+                .buildAnd(S32, Mask, MIRBuilder.buildConstant(S32, 0x4f000000))
+                .getReg(0);
+    }
+    auto Y = MIRBuilder.buildFSub(SrcTy, Src, Sub);
+    auto T = MIRBuilder.buildFPTOSI(S32, Y);
+    auto Top = MIRBuilder.buildAnd(
+        S32, Mask, MIRBuilder.buildConstant(S32, 0x80000000));
+    MIRBuilder.buildXor(Dst, T, Top);
+    MI.eraseFromParent();
+    return true;
+  }
   case G_SEXTLOAD:
   case G_ZEXTLOAD:
   case G_LOAD: {
