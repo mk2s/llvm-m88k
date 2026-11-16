@@ -14,7 +14,7 @@
 # CHECK-NEXT:    2 .text         00000004 [[#%x,TEXT:]] TEXT
 # CHECK-NEXT:    3 .data         00000004 [[#%x,DATA:]] DATA
 # CHECK:      SYMBOL TABLE:
-# CHECK:      {{0*}}[[#TEXT+4]] g {{ +}}.text{{.*}} etext
+# CHECK:      [[#%.8x,TEXT+4]] g .text{{.*}} etext
 
 .globl _start
 _start:
