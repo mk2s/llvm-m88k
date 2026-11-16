@@ -100,72 +100,56 @@ void M88kABIInfo::computeInfo(CGFunctionInfo &FI) const {
 RValue M88kABIInfo::EmitVAArg(CodeGen::CodeGenFunction &CGF,
                               CodeGen::Address VAListAddr, QualType Ty,
                               AggValueSlot Slot) const {
-  // Assume that va_list type is correct; should be pointer to LLVM type:
+  // The va_list type is (88open BCS):
   // struct {
-  //    int __va_arg;
-  //    int *__va_stk;
-  //    int *__va_reg;
+  //    int __va_arg;   // argument word index of the next argument
+  //    int *__va_stk;  // word N >= 8 is at __va_stk + 4 * N
+  //    int *__va_reg;  // word N < 8 (r2-r9) is at __va_reg + 4 * N
   // };
-
-  // How are structures handled?
-
-  // Align the argument
-  CharUnits PtrAlign = CharUnits::fromQuantity(4);
-  CharUnits DirectAlign = CharUnits::fromQuantity(8);
-  CharUnits SlotSize = CharUnits::fromQuantity(4);
-
+  // Arguments occupy whole words. 8-byte aligned arguments start at an even
+  // word index. An argument that does not fit into the remaining argument
+  // registers is on the stack. Aggregates are passed indirectly.
   Ty = getContext().getCanonicalType(Ty);
+  bool Indirect = isAggregateTypeForABI(Ty);
   auto TyInfo = getContext().getTypeInfoInChars(Ty);
-  CharUnits DirectSize = TyInfo.Width;
-  TypeInfoChars TypeInfo(DirectSize, DirectAlign, AlignRequirementKind::None);
+  CharUnits Size = Indirect ? CharUnits::fromQuantity(4) : TyInfo.Width;
+  bool Align8 = !Indirect && TyInfo.Align > CharUnits::fromQuantity(4);
+  uint64_t Words = (Size.getQuantity() + 3) / 4;
 
-  // Decide which pointer to use: __va_arg < 8 ? __va_reg : __va_stk.
-  Address VaArgPtr =
-      CGF.Builder.CreateStructGEP(VAListAddr, 0, "__va_arg.addr");
-  llvm::Value *VaArg = CGF.Builder.CreateLoad(VaArgPtr, "__va_arg");
-  llvm::Value *MaxRegs = llvm::ConstantInt::get(CGF.Int32Ty, 8);
+  CGBuilderTy &B = CGF.Builder;
+  llvm::Type *I32 = CGF.Int32Ty;
+  Address VaArgPtr = B.CreateStructGEP(VAListAddr, 0, "__va_arg.addr");
+  llvm::Value *Idx = B.CreateLoad(VaArgPtr, "__va_arg");
+  if (Align8)
+    Idx = B.CreateAnd(B.CreateAdd(Idx, llvm::ConstantInt::get(I32, 1)),
+                      llvm::ConstantInt::get(I32, -2), "__va_arg.aligned");
+  llvm::Value *Next =
+      B.CreateAdd(Idx, llvm::ConstantInt::get(I32, Words), "__va_arg.next");
+  B.CreateStore(Next, VaArgPtr);
   llvm::Value *InRegs =
-      CGF.Builder.CreateICmpULT(VaArg, MaxRegs, "fits_in_regs");
-
-  llvm::BasicBlock *InRegBlock = CGF.createBasicBlock("vaarg.in_reg");
-  llvm::BasicBlock *InStkBlock = CGF.createBasicBlock("vaarg.in_stk");
-  llvm::BasicBlock *ContBlock = CGF.createBasicBlock("vaarg.end");
-  CGF.Builder.CreateCondBr(InRegs, InRegBlock, InStkBlock);
-
-  // Value comes from register.
-  CGF.EmitBlock(InRegBlock);
-  Address VaRegPtr =
-      CGF.Builder.CreateStructGEP(VAListAddr, 2, "__va_reg.addr");
-  Address VaReg = Address(CGF.Builder.CreateLoad(VaRegPtr, "__va_reg"),
-                          CGF.Int8Ty, PtrAlign);
-  CGF.Builder.CreateBr(ContBlock);
-
-  // Value comes from stack.
-  CGF.EmitBlock(InStkBlock);
-  Address VaStkPtr =
-      CGF.Builder.CreateStructGEP(VAListAddr, 1, "__va_stk.addr");
-  Address VaStk = Address(CGF.Builder.CreateLoad(VaStkPtr, "__va_stk"),
-                          CGF.Int8Ty, PtrAlign);
-  CGF.Builder.CreateBr(ContBlock);
-
-  CGF.EmitBlock(ContBlock);
-  Address VaAddr =
-      emitMergePHI(CGF, VaReg, InRegBlock, VaStk, InStkBlock, "va_arg.addr");
-
-  // Load value and increment pointer.
-  RValue ResAddr =
-      emitVoidPtrVAArg(CGF, VaAddr, Ty, /*Indirect*/ false, TypeInfo, SlotSize,
-                       /*AllowHigher*/ true, Slot,
-                       /*ForceRightAdjust*/ true);
-
-  // Increment and store __va_arg.
-  llvm::Value *One = llvm::ConstantInt::get(CGF.Int32Ty, 1);
-  llvm::Value *NewVaArg = CGF.Builder.CreateAdd(VaArg, One, "__va_arg.inc");
-  CGF.Builder.CreateStore(NewVaArg, VaArgPtr);
-
-  return ResAddr;
+      B.CreateICmpULE(Next, llvm::ConstantInt::get(I32, 8), "fits_in_regs");
+  Address VaRegPtr = B.CreateStructGEP(VAListAddr, 2, "__va_reg.addr");
+  Address VaStkPtr = B.CreateStructGEP(VAListAddr, 1, "__va_stk.addr");
+  llvm::Value *Base =
+      B.CreateSelect(InRegs, B.CreateLoad(VaRegPtr, "__va_reg"),
+                     B.CreateLoad(VaStkPtr, "__va_stk"), "va_base");
+  llvm::Value *Off = B.CreateMul(Idx, llvm::ConstantInt::get(I32, 4));
+  // Big endian: values smaller than a word are in the low-order bytes.
+  if (Size.getQuantity() < 4)
+    Off = B.CreateAdd(Off,
+                      llvm::ConstantInt::get(I32, 4 - Size.getQuantity()));
+  llvm::Value *Ptr = B.CreateInBoundsGEP(CGF.Int8Ty, Base, Off, "va_arg.addr");
+  CharUnits SlotAlign = CharUnits::fromQuantity(Align8 ? 8 : 4);
+  if (Size.getQuantity() < 4)
+    SlotAlign = Size;
+  Address Addr(Ptr, CGF.ConvertTypeForMem(Indirect ? getContext().VoidPtrTy
+                                                   : Ty),
+               SlotAlign);
+  if (Indirect)
+    Addr = Address(B.CreateLoad(Addr, "va_arg.indirect"),
+                   CGF.ConvertTypeForMem(Ty), TyInfo.Align);
+  return CGF.EmitLoadOfAnyValue(CGF.MakeAddrLValue(Addr, Ty), Slot);
 }
-
 std::unique_ptr<TargetCodeGenInfo>
 CodeGen::createM88kTargetCodeGenInfo(CodeGenModule &CGM) {
   return std::make_unique<M88kTargetCodeGenInfo>(CGM.getTypes());

@@ -27,6 +27,9 @@ class M88kMachineFunctionInfo : public MachineFunctionInfo {
   /// Number of first variadic register, counted from 0.
   int VarArgsFirstReg = 0;
 
+  /// Argument word index of the first variadic argument.
+  int VarArgsFirstWord = 0;
+
   /// FrameIndex for start of varargs area for arguments passed in
   /// general purpose registers.
   int VarArgsRegIndex = 0;
@@ -44,6 +47,9 @@ public:
 
   int getFramePointerIndex() const { return FramePointerIndex; }
   void setFramePointerIndex(int Idx) { FramePointerIndex = Idx; }
+
+  int getVarArgsFirstWord() const { return VarArgsFirstWord; }
+  void setVarArgsFirstWord(int W) { VarArgsFirstWord = W; }
 
   int getVarArgsFirstReg() const { return VarArgsFirstReg; }
   void setVarArgsFirstReg(int RegNo) { VarArgsFirstReg = RegNo; }
