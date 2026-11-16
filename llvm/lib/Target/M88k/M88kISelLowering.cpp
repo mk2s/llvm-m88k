@@ -83,3 +83,15 @@ M88kTargetLowering::getRegisterByName(const char *RegName, LLT Ty,
   report_fatal_error(
       Twine("Invalid register name \"" + StringRef(RegName) + "\"."));
 }
+
+std::pair<unsigned, const TargetRegisterClass *>
+M88kTargetLowering::getRegForInlineAsmConstraint(const TargetRegisterInfo *TRI,
+                                                 StringRef Constraint,
+                                                 MVT VT) const {
+  if (Constraint.size() == 1 && Constraint[0] == 'r') {
+    if (VT.getSizeInBits() == 64)
+      return std::make_pair(0U, &M88k::GPR64RegClass);
+    return std::make_pair(0U, &M88k::GPRRegClass);
+  }
+  return TargetLowering::getRegForInlineAsmConstraint(TRI, Constraint, VT);
+}

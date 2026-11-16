@@ -74,6 +74,26 @@ M88kRegisterBankInfo::getInstrMapping(const MachineInstr &MI) const {
   const M88kSubtarget &STI = MF.getSubtarget<M88kSubtarget>();
   const TargetRegisterInfo &TRI = *STI.getRegisterInfo();
 
+  // Debug instructions can refer to values of any type (for example s16 or
+  // s1, which are never legalized). Put them in the general register bank.
+  if (MI.isDebugInstr()) {
+    SmallVector<const RegisterBankInfo::ValueMapping *, 4> DbgMappings(
+        MI.getNumOperands());
+    for (unsigned Idx = 0, E = MI.getNumOperands(); Idx != E; ++Idx) {
+      const MachineOperand &MO = MI.getOperand(Idx);
+      if (!MO.isReg() || !MO.getReg() || !MO.getReg().isVirtual())
+        continue;
+      LLT Ty = MRI.getType(MO.getReg());
+      if (!Ty.isValid())
+        continue;
+      DbgMappings[Idx] =
+          getValueMapping(Ty.getSizeInBits() > 32 ? PMI_GR64 : PMI_GR32);
+    }
+    return getInstructionMapping(DefaultMappingID, /*Cost=*/1,
+                                 getOperandsMapping(DbgMappings),
+                                 MI.getNumOperands());
+  }
+
   constexpr unsigned MaxNumOperands = 4;
   unsigned NumOperands = MI.getNumOperands();
   const ValueMapping *OperandsMapping = nullptr;

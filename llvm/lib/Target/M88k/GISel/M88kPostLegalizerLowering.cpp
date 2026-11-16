@@ -250,9 +250,9 @@ bool applySDivtoUDiv(GISelChangeObserver &Observer, MachineInstr &MI,
       std::tie(BBNumLT0DenomLT0, BBNumGE0DenomLT0) =
           InsertBrCond(BBDenomLT0, NumeratorReg);
     else if (NumSignBitIsZero)
-      BBNumGE0DenomLT0 = BBDenomGE0;
+      BBNumGE0DenomLT0 = BBDenomLT0;
     else if (NumSignBitIsOne)
-      BBNumLT0DenomLT0 = BBDenomGE0;
+      BBNumLT0DenomLT0 = BBDenomLT0;
     else
       llvm_unreachable("Impossible case reached");
   }
