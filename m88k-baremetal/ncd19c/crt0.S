@@ -36,7 +36,7 @@ _start:
 	or	%r12, %r12, %lo16(__libc_init_array)
 	bcnd	eq0, %r12, 3f
 	jsr	%r12
-3:	/* images linked with ncd19c_fpx.[Sc] patch the SFU1 vectors (otherwise the weak symbol is 0) */
+3:	/* patch the SFU1 vectors (build.sh links ncd19c_fpx.[Sc] by default; with --no-fpx the weak symbol is 0) */
 	or.u	%r12, %r0, %hi16(ncd_fpx_install)
 	or	%r12, %r12, %lo16(ncd_fpx_install)
 	bcnd	eq0, %r12, 4f

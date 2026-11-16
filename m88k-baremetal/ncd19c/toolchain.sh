@@ -3,7 +3,7 @@
 # (build.sh in this directory builds a single test.)
 # Usage: toolchain.sh [clang|rt|picolibc|prog|run|all]   (default: all)
 # Env: LLVM, PICOLIBC (checkout, branch m88k), M88K_CPU (default mc88100),
-#      FPX=1 (link the SFU1 FP exception handler into val), JOBS (default 2), CAP (memory-cap wrapper, default /home/mk2s/bin/capped if present).
+#      NO_FPX=1 (leave the default SFU1 FP completion handler out of val), JOBS (default 2), CAP (memory-cap wrapper, default /home/mk2s/bin/capped if present).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TESTS="$HERE/tests"
@@ -49,7 +49,7 @@ step_picolibc() { # 3. picolibc (branch m88k), installed to $PICO/install-m88k
   $CAP ninja -C "$PICO/build-m88k" -j"$JOBS" install
 }
 step_prog() {    # 4. build the validation program -> BSP out/val.coff
-  PICOLIBC="$PICO/install-m88k" M88K_CPU="$CPU" LLVM="$LLVM" $CAP "$BSP/build.sh" ${FPX:+--fpx} "$TESTS/val.c"
+  PICOLIBC="$PICO/install-m88k" M88K_CPU="$CPU" LLVM="$LLVM" $CAP "$BSP/build.sh" "$TESTS/val.c"
 }
 step_run() {     # 5. run in MAME (-window is hard-coded in the runner), compare with val.expected
   "$BSP/run-ncd19c.py" "$BSP/out/val.coff" --shot "$BSP/out/val.png" > "$BSP/out/val.serial"
