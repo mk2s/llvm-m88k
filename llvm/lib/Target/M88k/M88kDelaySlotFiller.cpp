@@ -218,8 +218,16 @@ bool M88kDelaySlotFiller::delayHasHazard(MachineBasicBlock::instr_iterator MI,
 void M88kDelaySlotFiller::insertDefsUses(MachineBasicBlock::instr_iterator MI,
                                          SmallSet<unsigned, 32> &RegDefs,
                                          SmallSet<unsigned, 32> &RegUses) {
-  // Only examine the explicit and non-variadic operands.
-  for (unsigned I = 0, E = MI->getDesc().getNumOperands(); I != E; ++I) {
+  // For the instruction owning the delay slot (branch, call or return), only
+  // examine the explicit and non-variadic operands: the implicit argument and
+  // return value registers of calls and returns may be set in the delay slot.
+  // For all other instructions, the implicit operands (e.g. the CARRY bit used
+  // by addu.ci and defined by addu.co) must be considered, too.
+  const MCInstrDesc &Desc = MI->getDesc();
+  unsigned E = (Desc.isBranch() || Desc.isCall() || Desc.isReturn())
+                   ? Desc.getNumOperands()
+                   : MI->getNumOperands();
+  for (unsigned I = 0; I != E; ++I) {
     const MachineOperand &MO = MI->getOperand(I);
     Register Reg;
 
