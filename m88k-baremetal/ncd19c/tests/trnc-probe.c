@@ -1,5 +1,5 @@
 /* Probe: which FP-to-integer conversions trap on a real MC88100? Build with the SFU1 handler:
- *   build.sh --fpx trnc-probe
+ *   build.sh trnc-probe
  * Raw trnc/int/nint (.ss and .sd) are run through inline asm over a sweep of values, so the
  * compiler's lowering is not involved. A probe stub is placed in front of the ncd19c_fpx entry stub
  * (vector 114): it records FPECR, FPHS2/FPLS2, FPPT, FPSR, FPCR, SXIP and SSBR as the hardware

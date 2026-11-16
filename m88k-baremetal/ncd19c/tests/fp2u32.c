@@ -36,11 +36,23 @@ static volatile double D[] = {0, 1, 0.5, 2147483647.0, 2147483648.0,
                               2147483648.5, 3e9, 4294967295.0};
 static volatile float F[] = {0, 1, 0.5f, 2147483520.0f, 2147483648.0f,
                              2147483904.0f, 3e9f, 4294967040.0f};
+/* In [2^30, 2^31) the hardware trnc traps although the result fits; the default SFU1 handler
+   completes it. Signed conversions too. */
+static volatile double DS[] = {1073741823.0, 1073741824.0, 1500000000.5, 2147483647.0,
+                               -1073741824.0, -1500000000.5, -2147483647.0, -2147483648.0};
+static volatile float FS[] = {536870912.0f, 1073741824.0f, 1610612736.0f, 2147483520.0f,
+                              -1073741824.0f, -1610612736.0f, -2147483520.0f, -2147483648.0f};
 int main(void) {
   for (unsigned i = 0; i < 8; ++i)
     line("d2u32", i, (uint32_t)D[i], 8);
   for (unsigned i = 0; i < 8; ++i)
     line("f2u32", i, (uint32_t)F[i], 8);
+  for (unsigned i = 0; i < 8; ++i)
+    line("d2s32", i, (uint32_t)(int32_t)DS[i], 8);
+  for (unsigned i = 0; i < 8; ++i)
+    line("f2s32", i, (uint32_t)(int32_t)FS[i], 8);
+  for (unsigned i = 0; i < 8; ++i)
+    line("d2u32b", i, (uint32_t)(DS[i] < 0 ? -DS[i] : DS[i]), 8);
   out("DONE\n");
   return 0;
 }

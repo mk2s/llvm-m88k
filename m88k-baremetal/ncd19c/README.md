@@ -57,19 +57,29 @@ spaces (the serial output is not).
   `__stack_size` 0x20000. Override with `--defsym`. Real unit has 2 MB data RAM at 0x08000000;
   MAME ncd19c has 8 MB data and 4 MB code.
 - The boot ROM accepts only .text, .data, .bss sections.
-## SFU1 floating-point exception handler (optional, `--fpx`)
+## SFU1 floating-point exception handler (installed by default; opt out with `--no-fpx`)
 A real MC88100 does not finish FP instructions with reserved operands (denormal, NaN, infinity),
 division by zero or integer-conversion overflow. It takes a precise SFU1 exception (vector 114,
 VBR+$390). Result underflow/overflow/inexact take an imprecise one (vector 115, VBR+$398).
-The ROM's own handler is not known to emulate these.
+The ROM's own handler does not complete these (the monitor prints `SFU1_Precise` and stops).
+
+**The 2^30 rule.** Verified on the real NCD 19c (`tests/trnc-probe.c`, `.agents/tasks/baremetal/trnc-probe-report.md`):
+`trnc`, `int` and `nint` (`.ss` and `.sd`) take the precise exception exactly when the operand's
+unbiased exponent is >= 30, i.e. |x| >= 2^30, even if the result fits in int32 (the manual calls this
+a conservative pre-check that software must finish). So every `(int)x` or `(unsigned)x` with
+|x| >= 2^30, the compiler's `fptoui` lowering for values >= 2^30, and compiler-rt's `__fixdfdi` /
+`__fixunsdfdi` chunks all trap on real silicon. An OS handles this; hence the bare-metal runtime
+installs the handler for every program: `build.sh` links `ncd19c_fpx.[Sc]` and `crt0.S` calls
+`ncd_fpx_install` before `main` (and `ncd_fpx_uninstall` in `_exit`).
+Opt out: `./build.sh --no-fpx prog` or `NO_FPX=1 ./build.sh prog` (`NO_FPX=1 ./toolchain.sh prog`);
+`crt0.S` references the handler weakly, so such an image has no handler and never touches the
+vectors. Do that only for code that must not have it. `--fpx` is still accepted (no-op).
 `ncd19c_fpx.{S,c,h}` patch the two vector slots (VBR = 0x04004000, read with `ldcr`) with a `br`
 to stubs that save r1-r31 and the FP control registers, restart the FPU (rte to a trap-not-taken,
 manual 6.4.3.4), call `ncd_fpx_handle`, write everything back and `rte`. The C part completes
 fadd/fsub/fmul/fdiv/fcmp/flt/int/nint/trnc with compiler-rt soft-float and applies the IEEE
-default action for underflow, overflow and inexact. `crt0.S` calls `ncd_fpx_install` before `main`
-and `ncd_fpx_uninstall` in `_exit` through weak references, so images without the handler are
-unchanged (the original vector words are restored on exit).
-    ./build.sh --fpx val.c ...   # or any test named fpx-*; FPX=1 ./toolchain.sh prog
+default action for underflow, overflow and inexact. The original vector words are restored in `_exit` (the vector table lives in the monitor's RAM).
+    ./build.sh --no-fpx val.c ...   # opt out (tests named fpx-* always link it)
 Limits: user exception handlers (FPCR enable bits) are not dispatched, only the default action is
 taken. Emulated precise arithmetic rounds to nearest even. The inexact flag is not tracked for
 emulated precise operations. An exception during the FPU restart ends in `ncd_fpx_fatal` (message
@@ -87,7 +97,7 @@ Tests (all in `tests/`):
   and compare screen/AUX output with `fpx-real.expected`. MAME never raises these exceptions and
   also gets NaN compares wrong (lines `inf-inf class` and `nan cmp` differ in MAME), so the
   exception path can only be checked on hardware.
-- `trnc-probe.c` (build with `--fpx`): hardware probe of raw `trnc/int/nint .ss/.sd` over a sweep
+- `trnc-probe.c`: hardware probe of raw `trnc/int/nint .ss/.sd` over a sweep
   of values; no `.expected`. Each line shows whether the SFU1 precise trap fired and the
   FPECR/FPPT/operand registers. Real NCD 19c result: the instruction traps (FPECR=FIOV, 0x80) exactly
   when the operand's unbiased exponent is >= 30 (|x| >= 2^30), even if the result fits in int32;
@@ -105,7 +115,7 @@ output of the same file compiled with the host compiler (`gcc -DHOST tests/val.c
 4. `prog`     build `tests/val.c` with `build.sh` -> `out/val.coff`.
 5. `run`      run in MAME (serial channel B to a TCP listener), save `out/val.png`, diff the serial
    output against `tests/val.expected`.
-Env: `LLVM`, `PICOLIBC`, `M88K_CPU` (default `mc88100`), `FPX=1`, `JOBS` (default 2), `CAP`
+Env: `LLVM`, `PICOLIBC`, `M88K_CPU` (default `mc88100`), `NO_FPX=1`, `JOBS` (default 2), `CAP`
 (memory-cap wrapper, default /home/mk2s/bin/capped; `CAP=` disables). Floating point: MAME
 implements the mc88100 FP instructions with softfloat but does not model FP exceptions or reserved
 operands, so it is more permissive than real silicon (see the SFU1 section above).
