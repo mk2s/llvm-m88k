@@ -32,9 +32,16 @@ int ncd_uart_getc(void) {
   return *UART_RHRB;
 }
 
+/* Screen lines start with two spaces: some monitors clip the first two columns. */
+static int screen_bol = 1;
 void ncd_screen_putc(char c) {
   if (c == '\r')
     return;
+  if (screen_bol && c != '\n') {
+    ncd_rom_out1char(' ');
+    ncd_rom_out1char(' ');
+  }
+  screen_bol = (c == '\n');
   ncd_rom_out1char((unsigned char)c);
 }
 
