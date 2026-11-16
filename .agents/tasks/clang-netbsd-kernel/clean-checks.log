@@ -1,0 +1,4 @@
+== llvm-nm -u count
+0
+== assym diff (empty = equal)
+EQUAL

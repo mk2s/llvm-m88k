@@ -60,14 +60,15 @@ sh /home/mk2s/Documents/llvm-m88k/.agents/tasks/clang-netbsd-kernel/build.sh net
 #    = nbmake-luna88k -j8 NO_M88K_MOVSTR=1 EXTRA_LINKFLAGS="-z nognustack" CC=clang-wrapper.sh
 #      LD=ld.lld AR=llvm-ar RANLIB=llvm-ranlib NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy
 #      SIZE="llvm-objdump -h" netbsd      (link: ld.lld -N -Ttext 0x20000 -e start -z nognustack -S)
-#    full rebuild: find GENERIC_CLANG -name '*.o' -o -name '*.a' | xargs rm -f
+#    full rebuild: sh $T/clean-build.sh   (removes *.o/*.a/netbsd, full log in build-clang.log)
 # 4. checks
 C=~/obj-luna88k/sys/arch/luna88k/compile
 /home/mk2s/Documents/llvm-m88k/build/bin/llvm-nm -u $C/GENERIC_CLANG/netbsd | wc -l          # 0
 diff <(sed 's/[[:space:]]\+/ /g' $C/GENERIC/assym.h | sort) \
      <(sed 's/[[:space:]]\+/ /g' $C/GENERIC_CLANG/assym.h | sort)                           # no output
 bash /home/mk2s/Documents/llvm-m88k/.agents/tasks/clang-netbsd-kernel/bulk.sh               # 284 OK
-/home/mk2s/Documents/llvm-m88k/build/bin/llvm-lit llvm/test/CodeGen/M88k llvm/test/MC/M88k  # from llvm-m88k
+/home/mk2s/Documents/llvm-m88k/build/bin/llvm-lit -v llvm/test/CodeGen/M88k llvm/test/MC/M88k  # 72/72, lit-llvm.log
+/home/mk2s/Documents/llvm-m88k/build/bin/llvm-lit -v build/tools/lld/test/ELF/etext-omagic.s       # 1/1, lit-lld.log (lld lit.cfg.py gained the `m88k` feature)
 # 5. boot in nono (headless, 20 s, nono is killed by timeout)
 T=/home/mk2s/Documents/llvm-m88k/.agents/tasks/clang-netbsd-kernel
 sh $T/boot-nono.sh $C/GENERIC/netbsd        $T/boot-gcc.log 20
@@ -88,11 +89,11 @@ lost output depending on when the client connected, so it is not used for logs.
 | # | criterion | result | evidence |
 |---|---|---|---|
 | 1 | every kernel file compiles with clang, -Werror, documented -Wno-* | 284 OK / 0 FAIL, no LLVM ERROR / unable to legalize | `bulk/result.txt`, `bulk/*.err` |
-| 2 | full link, no unresolved symbols | `llvm-nm -u` = 0; build log has 0 `m88k--netbsdelf3` invocations | `build-clang.log` |
-| 3 | clang assym.h equals GCC assym.h | equal after whitespace normalisation and sort | command in step 4 |
+| 2 | full link, no unresolved symbols | clean rebuild (clean-build.sh, 1646-line log, exit 0): `llvm-nm -u` = 0; 0 `m88k--netbsdelf3` invocations | `build-clang.log`, `clean-checks.log` |
+| 3 | clang assym.h equals GCC assym.h | equal after whitespace normalisation and sort (re-checked after the clean rebuild) | `clean-checks.log` |
 | 4 | same image format as GCC | ELF32 BE MC88000 EXEC, entry 0x20000, one RWX PT_LOAD at 0x20000; 1789592 bytes vs 1735468 | `compare.md` |
 | 5 | boot in nono | boots to `root device:` (same as GCC). Remaining diff: symtab address/entries, version string, avail memory 61536 vs 61588 KB (larger kernel), le0 MAC (random per run, also differs between GCC runs) | `boot-gcc.log`, `boot-clang.log`, `boot.diff` |
-| 6 | GCC build still works | fresh `nbconfig` + `nbmake-luna88k -j8 netbsd` with original tools in `/tmp/nb/GENERIC_GCC`: exit 0, text 1422972 vs reference 1423148 (data/bss equal); boots to `root device:` | `build-gcc-regress.log`, `size-gcc-regress.txt`, `boot-gcc-regress.log` |
+| 6 | GCC build still works | fresh `nbconfig` + `nbmake-luna88k -j8 netbsd` with original tools in `/tmp/nb/GENERIC_GCC`: exit 0, text 1422972 vs reference 1423148 (data/bss equal; the 176 bytes are 172 bytes of build-path strings in param.o/vers.o plus 4 unattributed, see `size-gcc-regress.txt`); boots to `root device:` | `build-gcc-regress.log`, `size-gcc-regress.txt`, `boot-gcc-regress.log` |
 | 7 | README with exact commands | this file | |
 
 Note for criterion 6: run `nbmake-luna88k assym.h` before `-j8` in a fresh
@@ -104,6 +105,7 @@ dir (`make depend` was not run); otherwise copy.S can race assym.h.
    Bisected (per file -O0, then per function with `optnone`, then llc options)
    to `uvm_map_findspace` and `-m88k-enable-delay-slot-filler`: the filler moved
    `addu.co` past the `addu.ci` that reads its carry. Fixed in M88kDelaySlotFiller.cpp.
+   Before/after assembly: `bisect.log` (produced by `bisect-demo.sh`, which rebuilds clang with the fixes reverted).
 2. **Hang after `scsibus0: waiting 2 seconds`** (callouts never fired). A
    memory breakpoint on the callout wheel showed `callout_hardclock()`
    corrupting bucket 0: `hardclock_ticks & 255` was compiled to `ld.bu` of the
@@ -120,6 +122,5 @@ dir (`make depend` was not run); otherwise copy.S can race assym.h.
   incoming `r31+32`, clang at `r31+0`, and struct-by-value arguments use
   different registers. An all-clang kernel is self-consistent, but hand
   assembly that passes or reads stack arguments, or mixing GCC and clang
-  objects, would break (mixing GCC `uvm_map.o` into the clang kernel faulted).
+  objects, would break. Hand asm audit: `abi-audit.md` (no stack-argument calls). Mixing a GCC-built `uvm_map.o` into the clang kernel panics with `Misaligned Access` before autoconfiguration finishes: `boot-mixed-uvm_map.log`.
 * ddb stack traces (db_trace.c prologue parsing) are tuned to GCC code.
-* `llvm-lit` for lld's new `etext-omagic.s` is UNSUPPORTED (no m88k lit feature).

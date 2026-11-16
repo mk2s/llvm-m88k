@@ -4,7 +4,7 @@ Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005
 Copyright (c) 1982, 1986, 1989, 1991, 1993
     The Regents of the University of California.  All rights reserved.
 
-NetBSD 3.0.1_STABLE (GENERIC_CLANG) #5: Mon Nov 16 16:06:08 EST 2026
+NetBSD 3.0.1_STABLE (GENERIC_CLANG) #7: Mon Nov 16 16:13:15 EST 2026
 	mk2s@mk2s-XPS-15-9510:/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG
 total memory = 65532 KB
 dipsw = 0xbfff
@@ -14,7 +14,7 @@ cpu0: M88100 rev 0xb, 2 CMMU
 cpu0: M88200 (16K) rev 0x9, full Icache, M88200 (16K) rev 0x9, full Dcache
 clock0 at mainbus0: MK48T02
 lcd0 at mainbus0
-le0 at mainbus0: address 02:00:01:02:2e:be
+le0 at mainbus0: address 02:00:01:ed:23:46
 le0: 32 receive buffers, 8 transmit buffers
 sio0 at mainbus0: uPD7201A
 siotty0 at sio0 channel 0 (console)
@@ -29,4 +29,4 @@ spc0 at mainbus0
 scsibus0 at spc0: 8 targets, 8 luns per target
 scsibus0: waiting 2 seconds for devices to settle...
 boot device: <unknown>
-root device: 
+root device: 

@@ -1,3 +1,9 @@
    text	   data	    bss	    dec	    hex	filename
 1423148	  67136	  84448	1574732	 18074c	/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC/netbsd
 1422972	  67136	  84448	1574556	 18069c	/tmp/nb/GENERIC_GCC/netbsd
+
+## Attribution of the 176-byte text delta (per-object TEXT-section sums, llvm-objdump -h, reference GENERIC/*.o vs /tmp/nb/GENERIC_GCC/*.o)
+param.o ref=10520 regress=10412
+vers.o ref=560 regress=496
+All other 287 objects (including lunafb.o, so the volatile change does not alter GCC code) are identical.
+param.o and vers.o embed the build directory / config path strings (reference: ~/obj-luna88k/.../GENERIC, regress: /tmp/nb/GENERIC_GCC), which accounts for 172 of the 176 bytes; the remaining 4 bytes are not attributed (likely section alignment padding in the final link).

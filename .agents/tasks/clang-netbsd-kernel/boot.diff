@@ -6,7 +6,7 @@
 < NetBSD 3.0.1_STABLE (GENERIC) #0: Mon Sep 28 10:00:04 EDT 2026
 < 	mk2s@mk2s-XPS-15-9510:/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC
 ---
-> NetBSD 3.0.1_STABLE (GENERIC_CLANG) #5: Mon Nov 16 16:06:08 EST 2026
+> NetBSD 3.0.1_STABLE (GENERIC_CLANG) #7: Mon Nov 16 16:13:15 EST 2026
 > 	mk2s@mk2s-XPS-15-9510:/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG
 11c11
 < avail memory = 61588 KB
@@ -15,4 +15,8 @@
 17c17
 < le0 at mainbus0: address 02:00:01:76:e8:0a
 ---
-> le0 at mainbus0: address 02:00:01:02:2e:be
+> le0 at mainbus0: address 02:00:01:ed:23:46
+32c32
+< root device: 
+---
+> root device: 

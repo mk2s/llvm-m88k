@@ -1,0 +1,49 @@
+# bisect-demo.sh: clang with the two fixes reverted (before) vs fixed (after), kernel flags, -O2 -S
+## kern_timeout.c callout_hardclock: 'hardclock_ticks & 255' (diff before after)
+284,285c284,285
+< 	ld.bu %r6, %r4, %lo16(hardclock_ticks)
+< 	mak %r6, %r6, 0<3>
+---
+> 	ld %r6, %r4, %lo16(hardclock_ticks)
+> 	mak %r6, %r6, 8<3>
+## uvm_map.c uvm_map_findspace etc: addu.co/addu.ci vs delay slot (first hunk, diff before after)
+5057,5058d5056
+< 	addu.ci %r8, %r0, %r0
+< 	bb1.n 0, %r8, .LBB26_46
+5059a5058,5059
+> 	addu.ci %r8, %r0, %r0
+> 	bb1 0, %r8, .LBB26_46
+5104,5105d5103
+< 	addu.ci %r8, %r0, %r0
+< 	bb1.n 0, %r8, .LBB26_46
+5106a5105,5106
+> 	addu.ci %r8, %r0, %r0
+> 	bb1 0, %r8, .LBB26_46
+## context before (uvm_map.before.s 5050-5062)
+	or %r7, %r0, 0
+.LBB26_27:                              | %select.end
+	addu %r7, %r22, %r7
+	subu %r8, %r0, %r24
+	and %r22, %r7, %r8
+	st %r22, %r30, 12
+.LBB26_28:                              | %if.end9.i
+	addu.ci %r8, %r0, %r0
+	bb1.n 0, %r8, .LBB26_46
+	addu.co %r7, %r22, %r4
+| %bb.29:                               | %if.end13.i
+	ld %r23, %r30, 8
+	ld %r19, %r23, 28
+## context after (uvm_map.after.s 5050-5062)
+	or %r7, %r0, 0
+.LBB26_27:                              | %select.end
+	addu %r7, %r22, %r7
+	subu %r8, %r0, %r24
+	and %r22, %r7, %r8
+	st %r22, %r30, 12
+.LBB26_28:                              | %if.end9.i
+	addu.co %r7, %r22, %r4
+	addu.ci %r8, %r0, %r0
+	bb1 0, %r8, .LBB26_46
+| %bb.29:                               | %if.end13.i
+	ld %r23, %r30, 8
+	ld %r19, %r23, 28
