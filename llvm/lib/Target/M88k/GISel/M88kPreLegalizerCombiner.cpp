@@ -204,8 +204,14 @@ bool M88kPreLegalizerCombiner::runOnMachineFunction(MachineFunction &MF) {
   CombinerInfo CInfo(/*AllowIllegalOps*/ true, /*ShouldLegalizeIllegal*/ false,
                      /*LegalizerInfo*/ nullptr, /*EnableOpt*/ false,
                      F.hasOptSize(), F.hasMinSize());
-  M88kPreLegalizerCombinerImpl Impl(MF, CInfo, &TPC, *KB,
-                                    /*CSEInfo*/ nullptr, RuleConfig, ST);
+  // Use the CSE info, so the builder folds constants. Without folding, rules
+  // like commute_shift and hoist_logic_op_with_same_opcode_hands undo each
+  // other forever on unoptimized input.
+  GISelCSEAnalysisWrapper &Wrapper =
+      getAnalysis<GISelCSEAnalysisWrapperPass>().getCSEWrapper();
+  auto *CSEInfo = &Wrapper.get(TPC.getCSEConfig());
+  M88kPreLegalizerCombinerImpl Impl(MF, CInfo, &TPC, *KB, CSEInfo, RuleConfig,
+                                    ST);
   return Impl.combineMachineInstrs();
 }
 

@@ -23,12 +23,21 @@ def bitfield_extract_from_and_ashr : GICombineRule<
                                                    ${matchinfo}); }]),
   (apply [{ Helper.applyBuildFn(*${root}, ${matchinfo}); }])>;
 
+// Like cast_combines, but without narrow_binop_{and,or,xor}. Those rules turn
+// trunc (logic X, C) into logic (trunc X, trunc C), and
+// hoist_logic_op_with_same_opcode_hands turns it back before trunc C is
+// folded, which loops forever on unoptimized input.
+def m88k_cast_combines: GICombineGroup<[
+  cast_of_cast_combines, select_of_zext, select_of_anyext, select_of_truncate,
+  buildvector_of_truncate, narrow_binop_add, narrow_binop_sub,
+  narrow_binop_mul, integer_of_truncate]>;
+
 // Like all_combines, but removed vector, fma and funnel shift combines.
 // intdiv_combines and mulh_combines result in worse code generation because
 // G_UMULH is mapped to a library call, and G_CTTZ results in a lengthy
 // instruction sequence.
 def m88k_combines : GICombineGroup<[integer_reassoc_combines, trivial_combines,
-    freeze_combines, cast_combines, combines_for_extload,
+    freeze_combines, m88k_cast_combines, combines_for_extload,
     undef_combines, identity_combines, phi_combines,
     simplify_add_to_sub, hoist_logic_op_with_same_opcode_hands, shifts_too_big,
     reassocs, ptr_add_immed_chain,
@@ -136,6 +145,7 @@ def compare_to_carry : GICombineGroup<[addsub_from_addicmp, addsub_from_addsub,
 def M88kPostLegalizerCombiner: GICombiner<
   "M88kPostLegalizerCombinerImpl", [
   compare_to_carry,
+  right_identity_zero, // E.g. the xor with 0 left by lowering a double fneg
   form_bitfield_extract, // Some rules require legalizer
   rotate_out_of_range // Required for left rotates, which produce a negative constant
   ]> {
