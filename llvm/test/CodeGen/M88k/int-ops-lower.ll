@@ -105,6 +105,7 @@ define i32 @usubsat(i32 %a, i32 %b) {
 ; CHECK:       | %bb.0:
 ; CHECK-NEXT:    subu.co %r2, %r2, %r3
 ; CHECK-NEXT:    subu.ci %r3, %r0, %r0
+; CHECK-NEXT:    subu %r3, %r0, %r3
 ; CHECK-NEXT:    ext %r3, %r3, 1<0>
 ; CHECK-NEXT:    mask %r4, %r3, 0
 ; CHECK-NEXT:    and.c %r2, %r2, %r3
@@ -283,6 +284,7 @@ define i1 @usubo(i32 %a, i32 %b) {
 ; CHECK:       | %bb.0:
 ; CHECK-NEXT:    subu.co %r2, %r2, %r3
 ; CHECK-NEXT:    subu.ci %r2, %r0, %r0
+; CHECK-NEXT:    subu %r2, %r0, %r2
 ; CHECK-NEXT:    jmp %r1
   %r = call {i32, i1} @llvm.usub.with.overflow.i32(i32 %a, i32 %b)
   %o = extractvalue {i32, i1} %r, 1
