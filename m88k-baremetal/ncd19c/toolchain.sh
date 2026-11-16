@@ -1,16 +1,18 @@
 #!/bin/bash
-# End-to-end bare-metal m88k (NCD 19c) build and MAME run.
-# Usage: build.sh [clang|rt|picolibc|prog|run|all]   (default: all)
+# Toolchain setup and end-to-end validation (tests/val.c) for the NCD 19c BSP.
+# (build.sh in this directory builds a single test.)
+# Usage: toolchain.sh [clang|rt|picolibc|prog|run|all]   (default: all)
 # Env: LLVM, PICOLIBC (checkout, branch m88k), M88K_CPU (default mc88100),
 #      FPX=1 (link the SFU1 FP exception handler into val), JOBS (default 2), CAP (memory-cap wrapper, default /home/mk2s/bin/capped if present).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+TESTS="$HERE/tests"
 LLVM="${LLVM:-/home/mk2s/Documents/llvm-m88k}"
 PICO="${PICOLIBC:-/home/mk2s/Documents/picolibc}"
 CPU="${M88K_CPU:-mc88100}"
 JOBS="${JOBS:-2}"
 CAP="${CAP-/home/mk2s/bin/capped}"
-BSP="$LLVM/m88k-baremetal/ncd19c"
+BSP="$HERE"
 BIN="$LLVM/build/bin"
 
 step_clang() {   # 1. clang + lld + tools (M88k is an experimental target)
@@ -47,14 +49,14 @@ step_picolibc() { # 3. picolibc (branch m88k), installed to $PICO/install-m88k
   $CAP ninja -C "$PICO/build-m88k" -j"$JOBS" install
 }
 step_prog() {    # 4. build the validation program -> BSP out/val.coff
-  PICOLIBC="$PICO/install-m88k" M88K_CPU="$CPU" LLVM="$LLVM" $CAP "$BSP/build.sh" ${FPX:+--fpx} "$HERE/val.c"
+  PICOLIBC="$PICO/install-m88k" M88K_CPU="$CPU" LLVM="$LLVM" $CAP "$BSP/build.sh" ${FPX:+--fpx} "$TESTS/val.c"
 }
 step_run() {     # 5. run in MAME (-window is hard-coded in the runner), compare with val.expected
   "$BSP/run-ncd19c.py" "$BSP/out/val.coff" --shot "$BSP/out/val.png" > "$BSP/out/val.serial"
-  tr -d '\004' < "$BSP/out/val.serial" | diff - "$HERE/val.expected" && echo "VAL OK: MAME output matches val.expected"
+  tr -d '\004' < "$BSP/out/val.serial" | diff - "$TESTS/val.expected" && echo "VAL OK: MAME output matches val.expected"
 }
 case "${1:-all}" in
   clang) step_clang;; rt) step_rt;; picolibc) step_picolibc;; prog) step_prog;; run) step_run;;
   all) step_clang; step_rt; step_picolibc; step_prog; step_run;;
-  *) echo "usage: $0 [clang|rt|picolibc|prog|run|all]" >&2; exit 2;;
+  *) echo "usage: toolchain.sh [clang|rt|picolibc|prog|run|all]" >&2; exit 2;;
 esac
