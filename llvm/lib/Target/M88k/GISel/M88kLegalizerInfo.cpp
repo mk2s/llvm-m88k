@@ -188,6 +188,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .lowerFor({S32})
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_SMULH).lower();
+  getActionDefinitionsBuilder({G_SCMP, G_UCMP}).lower();
   getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
       .legalFor({S32})
       .widenScalarToNextPow2(0, 32)
