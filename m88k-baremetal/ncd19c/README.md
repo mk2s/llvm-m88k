@@ -2,7 +2,7 @@
 
 Files: `crt0.S` (NCD header + entry, bss clear, stack), `ncd19c.ld` (linker script),
 `ncd19c_console.[ch]` (serial + screen console), `elf2ncd.py` (ELF -> NCD COFF),
-`build.sh`, `run-ncd19c.py` (MAME runner), `ncd19c-load.lua` (MAME autoboot script), `tests/`.
+`build.sh` (one test), `toolchain.sh` (clang/compiler-rt/picolibc + validation), `run-ncd19c.py` (MAME runner), `ncd19c-load.lua` (MAME autoboot script), `tests/`.
 
 ## Build
     ./build.sh boot-hello        # tests/boot-hello.c -> out/boot-hello.elf, out/boot-hello.coff
@@ -67,7 +67,7 @@ fadd/fsub/fmul/fdiv/fcmp/flt/int/nint/trnc with compiler-rt soft-float and appli
 default action for underflow, overflow and inexact. `crt0.S` calls `ncd_fpx_install` before `main`
 and `ncd_fpx_uninstall` in `_exit` through weak references, so images without the handler are
 unchanged (the original vector words are restored on exit).
-    ./build.sh --fpx val.c ...   # or any test named fpx-*; baremetal/: FPX=1 ./build.sh prog
+    ./build.sh --fpx val.c ...   # or any test named fpx-*; FPX=1 ./toolchain.sh prog
 Limits: user exception handlers (FPCR enable bits) are not dispatched, only the default action is
 taken. Emulated precise arithmetic rounds to nearest even. The inexact flag is not tracked for
 emulated precise operations. An exception during the FPU restart ends in `ncd_fpx_fatal` (message
@@ -85,3 +85,22 @@ Tests (all in `tests/`):
   and compare screen/AUX output with `fpx-real.expected`. MAME never raises these exceptions and
   also gets NaN compares wrong (lines `inf-inf class` and `nan cmp` differ in MAME), so the
   exception path can only be checked on hardware.
+## Toolchain and validation program (`toolchain.sh`)
+`tests/val.c` (printf, malloc, qsort, setjmp, 64-bit divide, hard-float) is built with the in-tree
+clang + ld.lld and picolibc (branch `m88k`) and runs in MAME `ncd19c`. `tests/val.expected` is the
+output of the same file compiled with the host compiler (`gcc -DHOST tests/val.c`).
+`./toolchain.sh all` runs steps 1-5, or give one step name:
+1. `clang`    configure (first time) and build clang, lld and tools in `build/`
+   (M88k is experimental: `-DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=M88k`).
+2. `rt`       build compiler-rt builtins (`build-rt-m88k`), install to clang's resource dir
+   (`libclang_rt.builtins.a` for `m88k-unknown-none-elf`).
+3. `picolibc` meson/ninja build of `~/Documents/picolibc` (branch `m88k`), installed to `install-m88k`.
+4. `prog`     build `tests/val.c` with `build.sh` -> `out/val.coff`.
+5. `run`      run in MAME (serial channel B to a TCP listener), save `out/val.png`, diff the serial
+   output against `tests/val.expected`.
+Env: `LLVM`, `PICOLIBC`, `M88K_CPU` (default `mc88100`), `FPX=1`, `JOBS` (default 2), `CAP`
+(memory-cap wrapper, default /home/mk2s/bin/capped; `CAP=` disables). Floating point: MAME
+implements the mc88100 FP instructions with softfloat but does not model FP exceptions or reserved
+operands, so it is more permissive than real silicon (see the SFU1 section above).
+Real hardware: back up `~/Documents/mame/tftpboot/0A000207`, `cp out/val.coff` over it, power-cycle,
+watch the screen (and AUX port, 9600 8N1).
