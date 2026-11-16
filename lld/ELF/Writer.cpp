@@ -868,6 +868,15 @@ template <class ELFT> void Writer<ELFT>::setReservedSymbolSections() {
     }
   }
 
+  if (!lastRO && ctx.arg.omagic) {
+    // With -N there is a single writable PT_LOAD, so the loop above finds no
+    // read-only segment. Like GNU ld, place _etext after the last read-only
+    // allocated section instead of leaving it at the start of the image.
+    for (OutputSection *os : ctx.outputSections)
+      if ((os->flags & SHF_ALLOC) && !(os->flags & SHF_WRITE) &&
+          os->type != SHT_NOBITS)
+        lastRO = os;
+  }
   if (lastRO) {
     // _etext is the first location after the last read-only loadable segment
     // that does not contain large sections.
