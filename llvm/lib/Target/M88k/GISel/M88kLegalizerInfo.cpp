@@ -131,7 +131,13 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       // Custom action if unaligned load/store.
       // TODO Does not handle f80 type.
       .customIf([=](const LegalityQuery &Query) {
-        if (!Query.Types[0].isScalar() || Query.Types[1] != P0)
+        if (Query.Types[1] != P0)
+          return false;
+        // Pointers are handled as s32.
+        if (Query.Types[0] == P0)
+          return Query.MMODescrs[0].MemoryTy.getSizeInBits() >
+                 Query.MMODescrs[0].AlignInBits;
+        if (!Query.Types[0].isScalar())
           return false;
 
         llvm::TypeSize Size = Query.Types[0].getSizeInBits();
@@ -152,6 +158,12 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       })
       .unsupportedIfMemSizeNotPow2()
       .lower();
+  // The stack pointer is saved and restored with copies. The variable sized
+  // area lies above the outgoing argument area, see M88kFrameLowering.
+  getActionDefinitionsBuilder({G_STACKSAVE, G_STACKRESTORE}).lower();
+  getActionDefinitionsBuilder(G_DYN_STACKALLOC)
+      .customFor({{P0, S32}})
+      .clampScalar(1, S32, S32);
   getActionDefinitionsBuilder(G_PTR_ADD)
       .legalFor({{P0, S32}})
       .clampScalar(1, S32, S32);
@@ -360,6 +372,12 @@ bool M88kLegalizerInfo::legalizeCustom(
 
     Register DstReg = MI.getOperand(0).getReg();
     Register AdrReg = MI.getOperand(1).getReg();
+    // A pointer is loaded as s32 and converted.
+    Register PtrDstReg;
+    if (MRI.getType(DstReg) == P0) {
+      PtrDstReg = DstReg;
+      DstReg = MRI.createGenericVirtualRegister(S32);
+    }
 
     auto ChunkAmt = MIRBuilder.buildConstant(S32, ChunkSize);
     auto ShiftAmt = MIRBuilder.buildConstant(S32, 8 * ChunkSize);
@@ -402,6 +420,8 @@ bool M88kLegalizerInfo::legalizeCustom(
 
     Register LastReg = IncAndload(AdrReg);
     Combine(ValReg, LastReg, DstReg);
+    if (PtrDstReg)
+      MIRBuilder.buildIntToPtr(PtrDstReg, DstReg);
 
     MI.eraseFromParent();
     break;
@@ -424,6 +444,9 @@ bool M88kLegalizerInfo::legalizeCustom(
 
     Register ValReg = StoreMI->getValueReg();
     Register AdrReg = StoreMI->getPointerReg();
+    // A pointer is stored as s32.
+    if (MRI.getType(ValReg) == P0)
+      ValReg = MIRBuilder.buildPtrToInt(S32, ValReg).getReg(0);
 
     auto ChunkAmt = MIRBuilder.buildConstant(S32, ChunkSize);
 
@@ -612,6 +635,23 @@ bool M88kLegalizerInfo::legalizeCustom(
                                      MIRBuilder.buildConstant(S32, 1));
     auto Mask = MIRBuilder.buildAnd(S32, Bit5, Const31);
     MIRBuilder.buildXor(Dst, Xor, Mask);
+    MI.eraseFromParent();
+    break;
+  }
+  case G_DYN_STACKALLOC: {
+    // The result of DYNALLOC is 16 byte aligned. Allocate more space for a
+    // larger alignment, and round the result up.
+    Register Dst = MI.getOperand(0).getReg();
+    Register Size = MI.getOperand(1).getReg();
+    uint64_t Alignment = MI.getOperand(2).getImm();
+    if (Alignment <= 16)
+      return true;
+    auto Extra = MIRBuilder.buildConstant(S32, Alignment - 16);
+    auto NewSize = MIRBuilder.buildAdd(S32, Size, Extra);
+    auto Alloc = MIRBuilder.buildDynStackAlloc(P0, NewSize, Align(16));
+    auto Add = MIRBuilder.buildPtrAdd(P0, Alloc, Extra);
+    auto Mask = MIRBuilder.buildConstant(S32, -(int64_t)Alignment);
+    MIRBuilder.buildPtrMask(Dst, Add, Mask);
     MI.eraseFromParent();
     break;
   }

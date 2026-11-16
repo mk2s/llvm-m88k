@@ -1445,6 +1445,16 @@ bool M88kInstructionSelector::select(MachineInstr &I) {
     return selectPtrMask(I, MBB, MRI);
   case TargetOpcode::G_VASTART:
     return selectVaStart(I, MBB, MRI);
+  case TargetOpcode::G_DYN_STACKALLOC: {
+    // The alignment (operand 2) is at most the stack alignment here, larger
+    // alignments are handled by the legalizer.
+    MF.getFrameInfo().setAdjustsStack(true);
+    MachineInstr *MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::DYNALLOC))
+                           .add(I.getOperand(0))
+                           .add(I.getOperand(1));
+    I.eraseFromParent();
+    return constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI);
+  }
   case TargetOpcode::G_SEXT_INREG:
     return selectSExtInreg(I, MBB, MRI);
   case TargetOpcode::G_ICMP:
