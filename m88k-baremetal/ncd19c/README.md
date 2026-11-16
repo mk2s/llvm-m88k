@@ -6,6 +6,20 @@ Files: `crt0.S` (NCD header + entry, bss clear, stack), `ncd19c.ld` (linker scri
 
 ## Build
     ./build.sh boot-hello        # tests/boot-hello.c -> out/boot-hello.elf, out/boot-hello.coff
+    ./build.sh libc-hello        # tests named libc-* / val* link picolibc + compiler-rt
+picolibc: branch `m88k` of /home/mk2s/Documents/picolibc, installed to `install-m88k`
+(`PICOLIBC` overrides). `ncd19c_stdio.c` gives tinystdio stdin/stdout/stderr on the console
+(output: serial + screen, input: serial). The heap is picolibc's sbrk between `__heap_start`
+and `__heap_end` from `ncd19c.ld`. Rebuild picolibc:
+
+    cd /home/mk2s/Documents/picolibc
+    meson setup build-m88k --cross-file scripts/cross-clang-m88k-unknown-none-elf.txt \
+      -Dmultilib=false -Dpicocrt=false -Dsemihost=false -Dtests=false -Dsingle-thread=true \
+      -Dthread-local-storage=false -Datomic-ungetc=false -Dio-long-long=true \
+      -Dnewlib-global-errno=true -Dspecsdir=none --buildtype=minsize --prefix=$PWD/install-m88k
+    ninja -C build-m88k -j2 && ninja -C build-m88k install
+
+The CPU is set by `-mcpu=` in the cross file (mc88100; mc88110 later).
 Env: `LLVM` (default /home/mk2s/Documents/llvm-m88k, uses build/bin/clang and ld.lld),
 `M88K_CPU` (default mc88100). Target: `--target=m88k-unknown-none-elf`.
 

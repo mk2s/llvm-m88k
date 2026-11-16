@@ -1,0 +1,6 @@
+setjmp 3 3 3
+longjmp0 ok
+malloc heap 1
+ll -1234567890123 18446744073709551615 123456789abcdef
+args 1 2 3 4 5 6 7 8 9 ten
+dbl 3.142 0.5 -1.000000e+10
