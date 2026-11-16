@@ -87,6 +87,11 @@ Tests (all in `tests/`):
   and compare screen/AUX output with `fpx-real.expected`. MAME never raises these exceptions and
   also gets NaN compares wrong (lines `inf-inf class` and `nan cmp` differ in MAME), so the
   exception path can only be checked on hardware.
+- `trnc-probe.c` (build with `--fpx`): hardware probe of raw `trnc/int/nint .ss/.sd` over a sweep
+  of values; no `.expected`. Each line shows whether the SFU1 precise trap fired and the
+  FPECR/FPPT/operand registers. Real NCD 19c result: the instruction traps (FPECR=FIOV, 0x80) exactly
+  when the operand's unbiased exponent is >= 30 (|x| >= 2^30), even if the result fits in int32;
+  MAME never traps. Everything below 2^30 in magnitude converts without a trap.
 ## Toolchain and validation program (`toolchain.sh`)
 `tests/val.c` (printf, malloc, qsort, setjmp, 64-bit divide, hard-float) is built with the in-tree
 clang + ld.lld and picolibc (branch `m88k`) and runs in MAME `ncd19c`. `tests/val.expected` is the
