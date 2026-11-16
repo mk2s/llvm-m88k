@@ -22,10 +22,13 @@
 #include "llvm/MC/MCParser/MCAsmParser.h"
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/MCParser/MCTargetAsmParser.h"
+#include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/Alignment.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -33,6 +36,7 @@
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
+#include "llvm/TargetParser/Triple.h"
 #include <cassert>
 #include <cstdint>
 #include <memory>
@@ -49,6 +53,37 @@ bool inRange(const MCExpr *Expr, int64_t MinValue, int64_t MaxValue) {
     return Value >= MinValue && Value <= MaxValue;
   }
   return false;
+}
+
+// Name of the sentinel token that replaces the operand list after the parser
+// has handled a GNU-style undotted directive (see parseGNUDirective).
+const char *const GNUDirectiveSentinel = "<gnu-directive>";
+
+// Condition names accepted by GNU as for bb0/bb1 and inside <...> bitfield
+// offsets.  Returns -1 if Name is not a condition name.
+int getGNUConditionName(StringRef Name) {
+  return StringSwitch<int>(Name)
+      .Case("nc", 0)
+      .Case("cp", 1)
+      .Case("eq", 2)
+      .Case("ne", 3)
+      .Case("gt", 4)
+      .Case("le", 5)
+      .Case("lt", 6)
+      .Case("ge", 7)
+      .Case("hi", 8)
+      .Case("ou", 8)
+      .Case("ls", 9)
+      .Case("ib", 9)
+      .Case("lo", 10)
+      .Case("in", 10)
+      .Case("hs", 11)
+      .Case("ob", 11)
+      .Case("be", 12)
+      .Case("nb", 13)
+      .Case("he", 14)
+      .Case("nh", 15)
+      .Default(-1);
 }
 
 // Instances of this class represented a parsed machine instruction
@@ -235,6 +270,11 @@ class M88kAsmParser : public MCTargetAsmParser {
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
   bool parseScaledRegister(OperandVector &Operands);
 
+  // GNU mode: handle undotted directives (word, text, data, align, space,
+  // string).  Sets Handled if Name was such a directive.  Returns true on
+  // error.
+  bool parseGNUDirective(StringRef Name, SMLoc NameLoc, bool &Handled);
+
   // Parse a %hi16(...) / %lo16(...) relocation operand.  On entry the lexer
   // is positioned on the identifier following the '%'.  Consumes the
   // identifier, the parenthesised sub-expression, and pushes an immediate
@@ -272,6 +312,9 @@ public:
                 const MCInstrInfo &MII, const MCTargetOptions &Options)
       : MCTargetAsmParser(Options, STI, MII), Parser(Parser),
         Lexer(Parser.getLexer()), SubtargetInfo(STI) {
+    // GNU as syntax is enabled by -mattr=+gnu-asm and implicitly for NetBSD.
+    GNUMode = STI.hasFeature(M88k::FeatureGNUAsm) ||
+              STI.getTargetTriple().isOSNetBSD();
     setAvailableFeatures(
         ComputeAvailableFeatures(SubtargetInfo.getFeatureBits()));
   }
@@ -281,6 +324,9 @@ private:
   MCAsmLexer &Lexer;
 
   const MCSubtargetInfo &SubtargetInfo;
+
+  // True if GNU as syntax is accepted in addition to the %-prefixed syntax.
+  bool GNUMode = false;
 };
 
 } // end anonymous namespace
@@ -290,6 +336,14 @@ private:
 #define GET_MATCHER_IMPLEMENTATION
 #define GET_MNEMONIC_SPELL_CHECKER
 #include "M88kGenAsmMatcher.inc"
+
+// Matches the normal register name, or the alternative register name.
+static unsigned matchRegisterName(StringRef Name) {
+  unsigned RegNo = MatchRegisterName(Name);
+  if (RegNo == 0)
+    RegNo = MatchRegisterAltName(Name);
+  return RegNo;
+}
 
 unsigned M88kAsmParser::validateTargetOperandClass(MCParsedAsmOperand &AsmOp,
                                                    unsigned Kind) {
@@ -354,6 +408,16 @@ bool M88kAsmParser::ParseDirective(AsmToken DirectiveID) {
 
 bool M88kAsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
                                      SMLoc NameLoc, OperandVector &Operands) {
+  if (GNUMode) {
+    bool Handled = false;
+    if (parseGNUDirective(Name, NameLoc, Handled))
+      return true;
+    if (Handled) {
+      Operands.push_back(M88kOperand::createToken(GNUDirectiveSentinel, NameLoc));
+      return false;
+    }
+  }
+
   // First operand in MCInst is instruction mnemonic.
   Operands.push_back(M88kOperand::createToken(Name, NameLoc));
 
@@ -375,6 +439,13 @@ bool M88kAsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
       // Read the third operand or a scaled register.
       if (getLexer().is(AsmToken::Comma)) {
         Parser.Lex();
+        // GNU as accepts "rot rd,rs,0<o>" as well as "rot rd,rs,<o>".
+        if (GNUMode && Name == "rot" && getLexer().is(AsmToken::Integer) &&
+            getLexer().peekTok().is(AsmToken::Less)) {
+          if (getLexer().getTok().getIntVal() != 0)
+            return Error(getLexer().getLoc(), "rot width must be 0");
+          Parser.Lex();
+        }
         if (getLexer().is(AsmToken::Less) && Name == "rot")
           Operands.push_back(
               M88kOperand::createToken("<", Parser.getTok().getLoc()));
@@ -402,6 +473,109 @@ bool M88kAsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name,
 
   // Consume the EndOfStatement.
   Parser.Lex();
+  return false;
+}
+
+bool M88kAsmParser::parseGNUDirective(StringRef Name, SMLoc NameLoc,
+                                      bool &Handled) {
+  enum { None, Word, Text, Data, AlignDir, Space, String } Kind =
+      StringSwitch<decltype(None)>(Name)
+          .Case("word", Word)
+          .Case("text", Text)
+          .Case("data", Data)
+          .Case("align", AlignDir)
+          .Case("space", Space)
+          .Case("string", String)
+          .Default(None);
+  if (Kind == None)
+    return false;
+  Handled = true;
+
+  MCStreamer &Out = Parser.getStreamer();
+  auto AtEnd = [&] { return Lexer.is(AsmToken::EndOfStatement); };
+
+  switch (Kind) {
+  case Word:
+    while (!AtEnd()) {
+      const MCExpr *Expr;
+      if (Parser.parseExpression(Expr))
+        return true;
+      Out.emitValue(Expr, 4, NameLoc);
+      if (Lexer.isNot(AsmToken::Comma))
+        break;
+      Parser.Lex();
+    }
+    break;
+  case Text:
+  case Data: {
+    // An optional subsection number is accepted and ignored.
+    const MCExpr *Expr;
+    if (!AtEnd() && Parser.parseExpression(Expr))
+      return true;
+    const MCObjectFileInfo *OFI = getContext().getObjectFileInfo();
+    Out.switchSection(Kind == Text ? OFI->getTextSection()
+                                   : OFI->getDataSection());
+    break;
+  }
+  case AlignDir: {
+    // GNU as for m88k counts bytes, not powers of two (as does the generic
+    // ".align" directive for this target).
+    SMLoc ValLoc = Lexer.getLoc();
+    int64_t Alignment;
+    if (Parser.parseAbsoluteExpression(Alignment))
+      return true;
+    if (Alignment <= 0 || !isPowerOf2_64(Alignment))
+      return Error(ValLoc, "alignment must be a power of 2");
+    bool HasFill = false;
+    int64_t Fill = 0;
+    if (Lexer.is(AsmToken::Comma)) {
+      Parser.Lex();
+      if (Parser.parseAbsoluteExpression(Fill))
+        return true;
+      HasFill = true;
+    }
+    if (!HasFill && Out.getCurrentSectionOnly()->useCodeAlign())
+      Out.emitCodeAlignment(Align(Alignment), &getSTI());
+    else
+      Out.emitValueToAlignment(Align(Alignment), Fill, 1);
+    break;
+  }
+  case Space: {
+    SMLoc ValLoc = Lexer.getLoc();
+    int64_t Size;
+    if (Parser.parseAbsoluteExpression(Size))
+      return true;
+    if (Size < 0)
+      return Error(ValLoc, "invalid space size");
+    int64_t Fill = 0;
+    if (Lexer.is(AsmToken::Comma)) {
+      Parser.Lex();
+      if (Parser.parseAbsoluteExpression(Fill))
+        return true;
+    }
+    Out.emitFill(*MCConstantExpr::create(Size, getContext()),
+                 static_cast<uint8_t>(Fill), NameLoc);
+    break;
+  }
+  case String:
+    while (!AtEnd()) {
+      std::string Str;
+      if (Parser.parseEscapedString(Str))
+        return true;
+      // GNU as for m88k does not append a NUL byte (unlike ".string").
+      Out.emitBytes(Str);
+      if (Lexer.isNot(AsmToken::Comma))
+        break;
+      Parser.Lex();
+    }
+    break;
+  case None:
+    break;
+  }
+
+  if (Lexer.isNot(AsmToken::EndOfStatement))
+    return Error(Lexer.getLoc(), "unexpected token in directive");
+  Parser.Lex(); // Consume the EndOfStatement.
   return false;
 }
 
@@ -437,6 +611,38 @@ bool M88kAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
       return true;
     Operands.push_back(M88kOperand::createReg(RegNo, StartLoc, EndLoc));
     return false;
+  }
+
+  if (GNUMode && Lexer.is(AsmToken::Identifier)) {
+    StringRef Id = Lexer.getTok().getIdentifier();
+    SMLoc IdLoc = Parser.getTok().getLoc();
+
+    // Bare hi16(sym) / lo16(sym).
+    if ((Id == "hi16" || Id == "lo16") &&
+        Lexer.peekTok().is(AsmToken::LParen))
+      return parseRelocExpr(Operands, IdLoc);
+
+    // GNU condition names as the first operand of bb0/bb1.
+    if (Operands.size() == 1 &&
+        (Mnemonic.starts_with("bb0") || Mnemonic.starts_with("bb1"))) {
+      int CC = getGNUConditionName(Id);
+      if (CC >= 0) {
+        SMLoc EndLoc = Lexer.getTok().getEndLoc();
+        Parser.Lex();
+        Operands.push_back(M88kOperand::createImm(
+            MCConstantExpr::create(CC, getContext()), IdLoc, EndLoc));
+        return false;
+      }
+    }
+
+    // Bare register name (r2, x4, cr1, fcr62, ...).
+    MCRegister RegNo = matchRegisterName(Id);
+    if (RegNo != 0 && Lexer.peekTok().isNot(AsmToken::LParen)) {
+      Parser.Lex();
+      Operands.push_back(
+          M88kOperand::createReg(RegNo, IdLoc, Lexer.getTok().getLoc()));
+      return false;
+    }
   }
 
   // Otherwise it is an immediate or address expression: an integer literal,
@@ -528,9 +734,14 @@ ParseStatus M88kAsmParser::parseBFOffset(OperandVector &Operands) {
   SMLoc StartLoc = Parser.getTok().getLoc();
 
   Parser.Lex();
-  if (Lexer.isNot(AsmToken::Integer))
+  int64_t Offset;
+  if (Lexer.is(AsmToken::Integer))
+    Offset = Parser.getTok().getIntVal();
+  else if (GNUMode && Lexer.is(AsmToken::Identifier) &&
+           getGNUConditionName(Parser.getTok().getIdentifier()) >= 0)
+    Offset = getGNUConditionName(Parser.getTok().getIdentifier());
+  else
     return ParseStatus::Failure;
-  int64_t Offset = Parser.getTok().getIntVal();
   Parser.Lex();
   if (Lexer.isNot(AsmToken::Greater))
     return ParseStatus::Failure;
@@ -651,30 +862,28 @@ ParseStatus M88kAsmParser::parsePCRel(OperandVector &Operands, unsigned Bits) {
   return ParseStatus::Success;
 }
 
-// Matches the normal register name, or the alternative register name.
-static unsigned matchRegisterName(StringRef Name) {
-  unsigned RegNo = MatchRegisterName(Name);
-  if (RegNo == 0)
-    RegNo = MatchRegisterAltName(Name);
-  return RegNo;
-}
-
 // Parses register of form %(r|x|cr|fcr)<No>.
 bool M88kAsmParser::parseRegister(MCRegister &RegNo, SMLoc &StartLoc,
                                   SMLoc &EndLoc, bool RestoreOnFailure) {
   StartLoc = Parser.getTok().getLoc();
 
-  // Eat the '%' prefix.
-  if (Parser.getTok().isNot(AsmToken::Percent))
+  // Eat the '%' prefix.  In GNU mode the prefix is optional.
+  bool HavePercent = Parser.getTok().is(AsmToken::Percent);
+  if (!HavePercent && !GNUMode)
     return true;
-  const AsmToken &PercentTok = Parser.getTok();
-  Parser.Lex();
+  const AsmToken PercentTok = Parser.getTok();
+  if (HavePercent)
+    Parser.Lex();
 
   // Match the register.
   if (Lexer.getKind() != AsmToken::Identifier ||
       (RegNo = matchRegisterName(Lexer.getTok().getIdentifier())) == 0) {
-    if (RestoreOnFailure)
-      Lexer.UnLex(PercentTok);
+    if (RestoreOnFailure) {
+      if (HavePercent)
+        Lexer.UnLex(PercentTok);
+      else
+        return true;
+    }
     return Error(StartLoc, "invalid register");
   }
 
@@ -734,6 +943,13 @@ bool M88kAsmParser::matchAndEmitInstruction(SMLoc IdLoc, unsigned &Opcode,
                                             MCStreamer &Out,
                                             uint64_t &ErrorInfo,
                                             bool MatchingInlineAsm) {
+  // An undotted directive was already emitted by parseGNUDirective.
+  if (Operands.size() == 1 &&
+      static_cast<M88kOperand &>(*Operands[0]).isToken() &&
+      static_cast<M88kOperand &>(*Operands[0]).getToken() ==
+          GNUDirectiveSentinel)
+    return false;
+
   MCInst Inst;
   FeatureBitset MissingFeatures;
   unsigned MatchResult = MatchInstructionImpl(
