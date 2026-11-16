@@ -1,0 +1,45 @@
+--- __always_make_compatlib ---
+--- __always_make_kernlib ---
+--- lunafb.o ---
+#   compile  GENERIC_CLANG/lunafb.o
+/home/mk2s/Documents/llvm-m88k/.agents/tasks/clang-netbsd-kernel/clang-wrapper.sh -ffreestanding -O2 -Werror -Wall -Wno-main -Wno-format-zero-length -Wpointer-arith -Wmissing-prototypes -Wstrict-prototypes -Wno-sign-compare -Wno-uninitialized -Dluna88k -I. -I/home/mk2s/Documents/netbsd-src/sys/arch -I/home/mk2s/Documents/netbsd-src/sys -nostdinc -DM88100 -DMAX_CPUS=4 -DERRATA__XXX_USR -DDEBUG -DDIAGNOSTIC -DMAXUSERS=8 -D_KERNEL -D_KERNEL_OPT -c /home/mk2s/Documents/netbsd-src/sys/arch/luna88k/dev/lunafb.c
+--- /home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG/lib/compat/libcompat.a ---
+--- /home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG/lib/kern/libkern.a ---
+--- /home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG/lib/compat/libcompat.a ---
+making sure the compat library is up to date...
+--- /home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG/lib/kern/libkern.a ---
+making sure the kern library is up to date...
+--- /home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG/lib/compat/libcompat.a ---
+`libcompat.a' is up to date.
+--- /home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG/lib/kern/libkern.a ---
+`libkern.a' is up to date.
+--- vers.o ---
+#    create  vers.c
+sh /home/mk2s/Documents/netbsd-src/sys/conf/newvers.sh
+#   compile  GENERIC_CLANG/vers.o
+/home/mk2s/Documents/llvm-m88k/.agents/tasks/clang-netbsd-kernel/clang-wrapper.sh       -ffreestanding   -O2 -Werror -Wall -Wno-main -Wno-format-zero-length -Wpointer-arith -Wmissing-prototypes -Wstrict-prototypes -Wno-sign-compare -Wno-uninitialized  -Dluna88k -I.  -I/home/mk2s/Documents/netbsd-src/sys/arch -I/home/mk2s/Documents/netbsd-src/sys -nostdinc -DM88100 -DMAX_CPUS="4" -DERRATA__XXX_USR -DDEBUG -DDIAGNOSTIC -DMAXUSERS=8 -D_KERNEL -D_KERNEL_OPT  -c vers.c
+--- netbsd ---
+#      link  GENERIC_CLANG/netbsd
+/home/mk2s/Documents/llvm-m88k/build/bin/ld.lld -N -Ttext 0x20000 -e start -z nognustack -S -o netbsd ${SYSTEM_OBJ} ${EXTRA_OBJ} vers.o
+
+netbsd:	file format elf32-m88k
+
+Sections:
+Idx Name                     Size     VMA      Type
+  0                          00000000 00000000 
+  1 .text                    0014e294 00020000 TEXT
+  2 .rodata                  00024c3d 0016e298 DATA
+  3 link_set_pools           000000d8 00192ed8 DATA
+  4 link_set_domains         00000010 00192fb0 DATA
+  5 link_set_sysctl_funcs    00000084 00192fc0 DATA
+  6 link_set_malloc_types    000000ec 00193044 DATA
+  7 link_set_dkwedge_methods 00000004 00193130 DATA
+  8 link_set_bufq_strats     0000000c 00193134 DATA
+  9 link_set_evcnts          00000030 00193140 DATA
+ 10 .data                    0000ed4c 00194000 DATA
+ 11 .bss                     0000f294 001a2d50 BSS
+ 12 .comment                 0000002c 00000000 
+ 13 .ident                   00003db5 00000000 
+ 14 .symtab                  00017c00 00000000 
+ 15 .shstrtab                000000ce 00000000 
+ 16 .strtab                  000153f0 00000000 

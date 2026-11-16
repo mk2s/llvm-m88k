@@ -1,0 +1,18 @@
+1c1
+< Loaded initial symtab at 0x1a10e0, strtab at 0x1bbc68, # entries 6247
+---
+> Loaded initial symtab at 0x1b1fe4, strtab at 0x1c9f90, # entries 5799
+7,8c7,8
+< NetBSD 3.0.1_STABLE (GENERIC) #0: Mon Sep 28 10:00:04 EDT 2026
+< 	mk2s@mk2s-XPS-15-9510:/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC
+---
+> NetBSD 3.0.1_STABLE (GENERIC_CLANG) #5: Mon Nov 16 16:06:08 EST 2026
+> 	mk2s@mk2s-XPS-15-9510:/home/mk2s/obj-luna88k/sys/arch/luna88k/compile/GENERIC_CLANG
+11c11
+< avail memory = 61588 KB
+---
+> avail memory = 61536 KB
+17c17
+< le0 at mainbus0: address 02:00:01:76:e8:0a
+---
+> le0 at mainbus0: address 02:00:01:02:2e:be
