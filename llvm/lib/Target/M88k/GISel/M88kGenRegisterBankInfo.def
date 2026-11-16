@@ -99,6 +99,10 @@ M88kGenRegisterBankInfo::getCopyMapping(unsigned DstBankID, unsigned SrcBankID,
       case 64:
         return getValueMapping(PMI_GR64);
       default:
+        // Narrow scalars (e.g. the s1 results of G_ICMP) live in a 32-bit
+        // register.
+        if (Size < 32)
+          return getValueMapping(PMI_GR32);
         llvm_unreachable("GR cannot handle that size");
       }
     } else {

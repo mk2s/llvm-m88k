@@ -23,11 +23,19 @@
 using namespace clang;
 using namespace clang::targets;
 
-static constexpr Builtin::Info BuiltinInfo[] = {
-#define BUILTIN(ID, TYPE, ATTRS)                                               \
-  {#ID, TYPE, ATTRS, nullptr, HeaderDesc::NO_HEADER, ALL_LANGUAGES},
+static constexpr int NumBuiltins =
+    clang::M88k::LastTSBuiltin - Builtin::FirstTSBuiltin;
+
+#define GET_BUILTIN_STR_TABLE
 #include "clang/Basic/BuiltinsM88k.inc"
+#undef GET_BUILTIN_STR_TABLE
+
+static constexpr Builtin::Info BuiltinInfos[] = {
+#define GET_BUILTIN_INFOS
+#include "clang/Basic/BuiltinsM88k.inc"
+#undef GET_BUILTIN_INFOS
 };
+static_assert(std::size(BuiltinInfos) == NumBuiltins);
 
 M88kTargetInfo::M88kTargetInfo(const llvm::Triple &Triple,
                                const TargetOptions &)
@@ -94,36 +102,31 @@ void M88kTargetInfo::getTargetDefines(const LangOptions &Opts,
                                       MacroBuilder &Builder) const {
   using llvm::Twine;
 
-  if (getTriple().isOSOpenBSD()) {
-    Builder.defineMacro("__m88k__");
-    Builder.defineMacro("__m88k");
-
-    // For sub-architecture
-    switch (CPU) {
-    case CK_88000:
-      Builder.defineMacro("__mc88000__");
-      break;
-    case CK_88100:
-      Builder.defineMacro("__mc88100__");
-      break;
-    case CK_88110:
-      Builder.defineMacro("__mc88110__");
-      break;
-    default:
-      break;
-    }
+  Builder.defineMacro("__m88k__");
+  Builder.defineMacro("__m88k");
+  Builder.defineMacro("__m88000__");
+  // For sub-architecture
+  switch (CPU) {
+  case CK_88000:
+    Builder.defineMacro("__mc88000__");
+    break;
+  case CK_88100:
+    Builder.defineMacro("__mc88100__");
+    break;
+  case CK_88110:
+    Builder.defineMacro("__mc88110__");
+    break;
+  default:
+    break;
   }
   if (getTriple().isOSSYSV4()) {
     Builder.defineMacro("m88000");
-    Builder.defineMacro("__m88000__");
     Builder.defineMacro("m88k");
-    Builder.defineMacro("__m88k__");
   }
 }
-
-ArrayRef<Builtin::Info> M88kTargetInfo::getTargetBuiltins() const {
-  return llvm::ArrayRef(BuiltinInfo,
-                        clang::M88k::LastTSBuiltin - Builtin::FirstTSBuiltin);
+llvm::SmallVector<Builtin::InfosShard>
+M88kTargetInfo::getTargetBuiltins() const {
+  return {{&BuiltinStrings, BuiltinInfos}};
 }
 
 bool M88kTargetInfo::hasFeature(StringRef Feature) const {
@@ -135,7 +138,7 @@ const char *const M88kTargetInfo::GCCRegNames[] = {
     // TODO Extended registers, control registers.
     "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7",  "r8",  "r9",  "r10",
     "r11", "r12", "r13", "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21",
-    "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r39", "r31"};
+    "r22", "r23", "r24", "r25", "r26", "r27", "r28", "r29", "r30", "r31"};
 
 ArrayRef<const char *> M88kTargetInfo::getGCCRegNames() const {
   return ArrayRef(GCCRegNames);

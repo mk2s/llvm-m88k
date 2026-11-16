@@ -51,6 +51,17 @@ static bool isPPCBareMetal(const llvm::Triple &Triple) {
          Triple.getEnvironment() == llvm::Triple::EABI;
 }
 
+/// Is the triple m88k-unknown-none-elf?
+static bool isM88kBareMetal(const llvm::Triple &Triple) {
+  if (Triple.getArch() != llvm::Triple::m88k)
+    return false;
+  if (Triple.getVendor() != llvm::Triple::UnknownVendor)
+    return false;
+  if (Triple.getOS() != llvm::Triple::UnknownOS)
+    return false;
+  return Triple.getEnvironmentName() == "elf";
+}
+
 static bool findRISCVMultilibs(const Driver &D,
                                const llvm::Triple &TargetTriple,
                                const ArgList &Args, DetectedMultilibs &Result) {
@@ -351,7 +362,8 @@ void BareMetal::findMultilibs(const Driver &D, const llvm::Triple &Triple,
 bool BareMetal::handlesTarget(const llvm::Triple &Triple) {
   return arm::isARMEABIBareMetal(Triple) ||
          aarch64::isAArch64BareMetal(Triple) || isRISCVBareMetal(Triple) ||
-         isPPCBareMetal(Triple);
+         isPPCBareMetal(Triple) ||
+         isM88kBareMetal(Triple);
 }
 
 Tool *BareMetal::buildLinker() const {

@@ -68,11 +68,13 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder(G_SELECT).lower();
   getActionDefinitionsBuilder({G_IMPLICIT_DEF, G_FREEZE})
       .legalFor({S32, P0})
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_MERGE_VALUES).legalFor({{S64, S32}});
   getActionDefinitionsBuilder(G_UNMERGE_VALUES).legalFor({{S32, S64}});
   getActionDefinitionsBuilder(G_CONSTANT)
       .legalFor({S32, P0})
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_INTTOPTR)
       .legalFor({{P0, S32}})
@@ -86,6 +88,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
 
   getActionDefinitionsBuilder({G_SEXT, G_ZEXT, G_ANYEXT})
       .legalFor({{S32, S16}, {S32, S8}, {S32, S1}})
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32)
       .widenScalarToNextPow2(1, 32);
   getActionDefinitionsBuilder(G_SEXT_INREG).legalForTypeWithAnyImm({S32});
@@ -143,6 +146,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder({G_ADD, G_SUB})
       .legalFor({S32})
       .legalIf(all(typeInSet(0, {V8S8, V4S16, V2S32}), IsMC88110))
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder({G_UADDO, G_UADDE, G_USUBO, G_USUBE})
       .legalFor({{S32, S32}})
@@ -154,10 +158,12 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .legalFor({S32})
       .customIf(all(typeInSet(0, {S64}), IsMC88110))
       .libcallFor({S64})
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S64);
   getActionDefinitionsBuilder(G_SDIV)
       .legalFor({S32})
       .libcallFor({S64})
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S64);
   getActionDefinitionsBuilder({G_SREM, G_UREM})
       .lowerFor({S32})
@@ -165,14 +171,16 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder({G_UMULH, G_SMULH}).lower();
   getActionDefinitionsBuilder({G_AND, G_OR, G_XOR})
       .legalFor({S32})
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder({G_SBFX, G_UBFX})
       .legalFor({{S32, S32}})
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder({G_SHL, G_LSHR, G_ASHR})
       .legalFor({{S32, S32}})
-      .clampScalar(0, S32, S32)
-      .clampScalar(1, S32, S32);
+      .clampScalar(1, S32, S32)
+      .widenScalarToNextPow2(0, 32)
+      .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_ROTR).legalFor({{S32}, {S32}});
   getActionDefinitionsBuilder({G_ROTL, G_FSHL, G_FSHR}).lower();
   getActionDefinitionsBuilder(G_CTLZ)
@@ -186,6 +194,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
 
   getActionDefinitionsBuilder(G_ICMP)
       .legalForCartesianProduct({S1}, {S32, P0})
+      .widenScalarToNextPow2(1, 32)
       .clampScalar(1, S32, S32);
   getActionDefinitionsBuilder(G_BRCOND).legalFor({S1});
   getActionDefinitionsBuilder(G_BRJT).legalFor({{P0, S32}});
