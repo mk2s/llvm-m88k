@@ -472,6 +472,10 @@ public:
     case llvm::Triple::x86_64:
       this->HasFloat128 = true;
       break;
+    case llvm::Triple::m88k:
+      // NetBSD's m88k ansi.h (and GCC) use unsigned int for size_t.
+      this->SizeType = TargetInfo::UnsignedInt;
+      break;
     }
   }
 };
