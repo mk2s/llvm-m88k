@@ -53,6 +53,36 @@ _exit:
 	ld	%r31, %r13, %lo16(__ncd_mon_r31)
 	jmp	%r1
 
+	/* void ncd_rom_out1char(int c): call ROM out1Char (0x0400b9ec, char in r2).
+	   The ROM does not preserve all callee-saved registers (r22 was observed to
+	   change), so save r14-r25, r30 and r1 around it. The save area starts at
+	   r31+32: the ROM follows the 88open BCS, where a callee may store its
+	   arguments into the 32 bytes at the caller's r31+0. */
+	.globl	ncd_rom_out1char
+ncd_rom_out1char:
+	subu	%r31, %r31, 96
+	st.d	%r14, %r31, 32
+	st.d	%r16, %r31, 40
+	st.d	%r18, %r31, 48
+	st.d	%r20, %r31, 56
+	st.d	%r22, %r31, 64
+	st.d	%r24, %r31, 72
+	st	%r30, %r31, 80
+	st	%r1, %r31, 84
+	or.u	%r13, %r0, 0x0400
+	or	%r13, %r13, 0xb9ec
+	jsr	%r13
+	ld.d	%r14, %r31, 32
+	ld.d	%r16, %r31, 40
+	ld.d	%r18, %r31, 48
+	ld.d	%r20, %r31, 56
+	ld.d	%r22, %r31, 64
+	ld.d	%r24, %r31, 72
+	ld	%r30, %r31, 80
+	ld	%r1, %r31, 84
+	addu	%r31, %r31, 96
+	jmp	%r1
+
 	/* First words of .data (see ncd19c.ld). The MAME loader checks __ncd_mon_r1 to confirm
 	   that the jump to the image took effect. */
 	.section .data.ncdmon,"aw"

@@ -7,8 +7,10 @@
 #define SR_RXRDY 0x01
 #define SR_TXRDY 0x04
 
-/* ROM out1Char: character in r2, drawn at the monitor's text cursor. */
-#define ROM_OUT1CHAR ((void (*)(int))0x0400b9ec)
+/* ROM out1Char: character in r2, drawn at the monitor's text cursor. It is
+   called through a wrapper in crt0.S, because it clobbers callee-saved
+   registers. */
+void ncd_rom_out1char(int c);
 
 unsigned ncd_console_mask = NCD_CON_SERIAL | NCD_CON_SCREEN;
 
@@ -33,7 +35,7 @@ int ncd_uart_getc(void) {
 void ncd_screen_putc(char c) {
   if (c == '\r')
     return;
-  ROM_OUT1CHAR((unsigned char)c);
+  ncd_rom_out1char((unsigned char)c);
 }
 
 void ncd_console_putc(char c) {
