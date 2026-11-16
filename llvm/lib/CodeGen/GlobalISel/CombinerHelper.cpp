@@ -960,6 +960,11 @@ bool CombinerHelper::matchCombineLoadWithAndMask(MachineInstr &MI,
 
   // Don't modify the memory access size if this is atomic/volatile, but we can
   // still adjust the opcode to indicate the high bit behavior.
+  // On big-endian targets, the low bits are at the highest address, so a
+  // narrower load at the same address would read the wrong bytes.
+  if (LoadMI->isSimple() && LoadSizeBits.getValue() > MaskSizeBits &&
+      MI.getMF()->getDataLayout().isBigEndian())
+    return false;
   if (LoadMI->isSimple())
     MemDesc.MemoryTy = LLT::scalar(MaskSizeBits);
   else if (LoadSizeBits.getValue() > MaskSizeBits ||
