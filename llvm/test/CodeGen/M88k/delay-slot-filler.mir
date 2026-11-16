@@ -250,3 +250,48 @@ body:             |
     ; CHECK:      $r1 = LDAws killed $r2, killed $r3
     ; CHECK-NEXT: JMP $r1
 ...
+---
+# The addu.co defines the CARRY bit which the following addu.ci uses
+# implicitly. Moving the addu.co into the delay slot of the branch would
+# compute the addu.ci with a stale carry (miscompiled uvm_map_findspace()
+# in the NetBSD kernel).
+name:            carry
+alignment:       4
+legalized:       true
+regBankSelected: true
+selected:        true
+tracksRegLiveness: true
+tracksDebugUserValues: true
+liveins:
+  - { reg: '$r2' }
+  - { reg: '$r3' }
+  - { reg: '$r1' }
+frameInfo:
+  maxAlignment:    1
+  maxCallFrameSize: 0
+machineFunctionInfo: {}
+body:             |
+  bb.0:
+    successors: %bb.1, %bb.2
+    liveins: $r1, $r2, $r3
+
+    renamable $r7 = ADDUrrco renamable $r2, renamable $r3, implicit-def $carry
+    renamable $r8 = ADDUrrci $r0, $r0, implicit $carry
+    BB1 0, killed renamable $r8, %bb.2
+    ; The addu.co must stay before the addu.ci.
+    ; CHECK:      renamable $r7 = ADDUrrco renamable $r2, renamable $r3, implicit-def $carry
+    ; CHECK-NEXT: renamable $r8 = ADDUrrci $r0, $r0, implicit $carry
+    ; CHECK-NEXT: BB1 0, killed renamable $r8, %bb.2
+
+  bb.1:
+    liveins: $r1, $r7
+
+    $r2 = ORrr $r0, killed $r7
+    JMP $r1, implicit $r2
+
+  bb.2:
+    liveins: $r1
+
+    $r2 = ORri $r0, 0
+    JMP $r1, implicit $r2
+...
