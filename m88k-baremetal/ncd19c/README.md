@@ -45,8 +45,10 @@ Choose a port other than 2159/2160/2260/2323/2324.
 
 ## Console
 Output goes to the SCC2681 channel B (AUX, 0x0100002C) and, unconditionally by default, to the
-screen through the ROM `out1Char` routine (`ncd_console_mask`), since the real unit has no serial
-console option.
+screen through the ROM `out1Char` routine (`ncd_console_mask`), because the ROM monitor has no way to use the serial port (its console is
+screen and keyboard only). The serial port itself works and carries what this BSP writes, plus the ROM's exception
+messages (e.g. `SFU1_Precise`, which appear on serial only). Screen lines are indented by two
+spaces (the serial output is not).
 
 ## Memory map (ncd19c.ld)
 - 0x01000000 DUART (SR_B +0x24, THR_B +0x2C)
