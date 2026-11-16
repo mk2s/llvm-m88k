@@ -398,9 +398,13 @@ bool M88kCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
       FuncInfo->setVarArgsRegIndex(GPRIdx);
     }
 
-    // Create frame index of first var arg stack parameter.
-    FuncInfo->setStackIndex(
-        MFI.CreateFixedObject(4, CCInfo.getStackSize(), false));
+    // The va_list uses argument word indices (88open BCS): words 0-7 are
+    // r2-r9, word 8 and up are on the stack. Record the index of the first
+    // variadic word and the start of the incoming stack argument area.
+    unsigned StackSize = CCInfo.getStackSize();
+    FuncInfo->setVarArgsFirstWord(StackSize ? 8 + StackSize / 4
+                                            : FirstVariadicReg);
+    FuncInfo->setStackIndex(MFI.CreateFixedObject(4, 0, false));
   }
   return true;
 }

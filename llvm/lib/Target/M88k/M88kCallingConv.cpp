@@ -23,8 +23,12 @@ static bool CC_M88k_Custom_64(unsigned &ValNo, MVT &ValVT, MVT &LocVT,
                                             M88k::R7};
 
   MCRegister RegHi = State.AllocateReg(HiRegList, ShadowRegList);
-  if (RegHi == 0)
-    return false; // TODO Do we need to allocate unused register?
+  if (RegHi == 0) {
+    // The value goes on the stack. As in the 88open BCS, all following
+    // arguments go on the stack too, so a left-over r9 is not used.
+    State.AllocateReg(M88k::R9);
+    return false;
+  }
 
   MCRegister RegLo = State.AllocateReg(LoRegList);
   assert(RegLo && "Could not allocate odd part of register pair");

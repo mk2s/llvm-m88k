@@ -421,64 +421,68 @@ bool M88kInstructionSelector::selectVaStart(MachineInstr &I,
                                                MachineBasicBlock &MBB,
                                                MachineRegisterInfo &MRI) const {
   assert(I.getOpcode() == TargetOpcode::G_VASTART && "Unexpected G code");
-
   MachineFunction &MF = *MBB.getParent();
   M88kMachineFunctionInfo *FuncInfo = MF.getInfo<M88kMachineFunctionInfo>();
-
   Register VaList = I.getOperand(0).getReg();
+  const DebugLoc &DL = I.getDebugLoc();
 
-  // Store the number of the first var arg register.
+  // The va_list is { int __va_arg; int *__va_stk; int *__va_reg; } (88open
+  // BCS). __va_arg is the argument word index of the next argument. Word N
+  // is at __va_reg + 4 * N for N < 8 and at __va_stk + 4 * N otherwise.
+  auto Store = [&](Register Val, int64_t Off) {
+    MachineInstr *MI = BuildMI(MBB, I, DL, TII.get(M88k::STriw))
+                           .addReg(Val, RegState::Kill)
+                           .addReg(VaList)
+                           .addImm(Off);
+    return constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI);
+  };
+  // Address of frame object FI, minus Bias.
+  auto Addr = [&](int FI, int64_t Bias) -> Register {
+    Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
+    MachineInstr *MI = BuildMI(MBB, I, DL, TII.get(M88k::ADDri))
+                           .addReg(Temp, RegState::Define)
+                           .addFrameIndex(FI)
+                           .addImm(0);
+    if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+      return Register();
+    if (Bias == 0)
+      return Temp;
+    Register Res = MRI.createVirtualRegister(&M88k::GPRRegClass);
+    MI = BuildMI(MBB, I, DL, TII.get(M88k::SUBUri))
+             .addReg(Res, RegState::Define)
+             .addReg(Temp, RegState::Kill)
+             .addImm(Bias);
+    if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+      return Register();
+    return Res;
+  };
+
+  // __va_arg: word index of the first variadic argument.
   Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
-  MachineInstr *MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ORriu))
+  MachineInstr *MI = BuildMI(MBB, I, DL, TII.get(M88k::ORri))
                          .addReg(Temp, RegState::Define)
                          .addReg(M88k::R0)
-                         .addImm(FuncInfo->getVarArgsFirstReg());
-  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+                         .addImm(FuncInfo->getVarArgsFirstWord());
+  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI) ||
+      !Store(Temp, 0))
     return false;
 
-  MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::STriw))
-                         .addReg(Temp, RegState::Kill)
-                         .addReg(VaList)
-                         .addImm(0);
-  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+  // __va_stk: the stack argument area holds word 8 at offset 0.
+  Register Stk = Addr(FuncInfo->getStackIndex(), 32);
+  if (!Stk || !Store(Stk, 4))
     return false;
 
-  // Store the pointer to the argument area on the stack.
-  Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
-  MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ADDri))
-                         .addReg(Temp, RegState::Define)
-                         .addFrameIndex(FuncInfo->getStackIndex())
-                         .addImm(0);
-  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+  // __va_reg: the register save area starts with the register pair that
+  // holds the first variadic register.
+  unsigned FirstReg = FuncInfo->getVarArgsFirstReg();
+  Register Reg = FirstReg < 8
+                     ? Addr(FuncInfo->getVarArgsRegIndex(), 8 * (FirstReg / 2))
+                     : Addr(FuncInfo->getStackIndex(), 32);
+  if (!Reg || !Store(Reg, 8))
     return false;
-
-  MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::STriw))
-                         .addReg(Temp, RegState::Kill)
-                         .addReg(VaList)
-                         .addImm(4);
-  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
-    return false;
-
-  // Store the pointer to the register save area.
-  Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
-  MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ADDri))
-                         .addReg(Temp, RegState::Define)
-                         .addFrameIndex(FuncInfo->getVarArgsRegIndex())
-                         .addImm(0);
-  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
-    return false;
-
-  MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::STriw))
-                         .addReg(Temp, RegState::Kill)
-                         .addReg(VaList)
-                         .addImm(8);
-  if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
-    return false;
-
   I.eraseFromParent();
   return true;
 }
-
 bool M88kInstructionSelector::selectGlobalValue(
     MachineInstr &I, MachineBasicBlock &MBB, MachineRegisterInfo &MRI) const {
   assert(I.getOpcode() == TargetOpcode::G_GLOBAL_VALUE && "Unexpected G code");
