@@ -363,6 +363,8 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
     switch (os) {
     case llvm::Triple::OpenBSD:
       return std::make_unique<OpenBSDTargetInfo<M88kTargetInfo>>(Triple, Opts);
+    case llvm::Triple::NetBSD:
+      return std::make_unique<NetBSDTargetInfo<M88kTargetInfo>>(Triple, Opts);
     case llvm::Triple::SYSV4:
       return std::make_unique<SYSVTargetInfo<M88kTargetInfo>>(Triple, Opts);
     default:
