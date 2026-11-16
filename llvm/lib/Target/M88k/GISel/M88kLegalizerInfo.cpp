@@ -64,7 +64,10 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   auto IsMC88110 = LegalityPredicate(
       [=, &ST](const LegalityQuery &Query) { return ST.isMC88110(); });
 
-  getActionDefinitionsBuilder(G_PHI).legalFor({S64, S32, P0});
+  getActionDefinitionsBuilder(G_PHI)
+      .legalFor({S64, S32, P0})
+      .widenScalarToNextPow2(0, 32)
+      .clampScalar(0, S32, S64);
   getActionDefinitionsBuilder(G_SELECT).lower();
   getActionDefinitionsBuilder({G_IMPLICIT_DEF, G_FREEZE})
       .legalFor({S32, P0})
