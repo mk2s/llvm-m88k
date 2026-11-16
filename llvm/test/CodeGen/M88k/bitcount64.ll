@@ -55,35 +55,34 @@ define i64 @ctlz_zu(i64 %a) {
 define i64 @cttz(i64 %a) {
 ; CHECK-LABEL: cttz:
 ; CHECK:       | %bb.0:
-; CHECK-NEXT:    subu %r4, %r0, 1
-; CHECK-NEXT:    addu %r5, %r2, %r4
-; CHECK-NEXT:    and.c %r2, %r5, %r2
-; CHECK-NEXT:    or %r5, %r0, 32
+; CHECK-NEXT:    subu %r4, %r2, 1
+; CHECK-NEXT:    and.c %r2, %r4, %r2
+; CHECK-NEXT:    or %r4, %r0, 32
 ; CHECK-NEXT:    ff1 %r2, %r2
-; CHECK-NEXT:    xor %r6, %r2, 31
+; CHECK-NEXT:    xor %r5, %r2, 31
 ; CHECK-NEXT:    ext %r2, %r2, 1<5>
 ; CHECK-NEXT:    mask %r2, %r2, 31
-; CHECK-NEXT:    xor %r2, %r6, %r2
-; CHECK-NEXT:    subu %r2, %r5, %r2
-; CHECK-NEXT:    addu.co %r2, %r2, %r5
-; CHECK-NEXT:    addu.ci %r6, %r0, %r0
-; CHECK-NEXT:    addu %r4, %r3, %r4
-; CHECK-NEXT:    and.c %r4, %r4, %r3
-; CHECK-NEXT:    ff1 %r4, %r4
-; CHECK-NEXT:    xor %r7, %r4, 31
-; CHECK-NEXT:    ext %r4, %r4, 1<5>
-; CHECK-NEXT:    mask %r4, %r4, 31
-; CHECK-NEXT:    xor %r4, %r7, %r4
-; CHECK-NEXT:    subu %r4, %r5, %r4
+; CHECK-NEXT:    xor %r2, %r5, %r2
+; CHECK-NEXT:    subu %r2, %r4, %r2
+; CHECK-NEXT:    addu.co %r2, %r2, %r4
+; CHECK-NEXT:    addu.ci %r5, %r0, %r0
+; CHECK-NEXT:    subu %r6, %r3, 1
+; CHECK-NEXT:    and.c %r6, %r6, %r3
+; CHECK-NEXT:    ff1 %r6, %r6
+; CHECK-NEXT:    xor %r7, %r6, 31
+; CHECK-NEXT:    ext %r6, %r6, 1<5>
+; CHECK-NEXT:    mask %r6, %r6, 31
+; CHECK-NEXT:    xor %r6, %r7, %r6
+; CHECK-NEXT:    subu %r4, %r4, %r6
 ; CHECK-NEXT:    cmp %r3, %r3, 0
 ; CHECK-NEXT:    ext %r3, %r3, 1<2>
-; CHECK-NEXT:    ext %r5, %r3, 0<31>
+; CHECK-NEXT:    ext %r6, %r3, 0<31>
 ; CHECK-NEXT:    and %r2, %r2, %r3
-; CHECK-NEXT:    and %r6, %r6, %r5
+; CHECK-NEXT:    and %r5, %r5, %r6
 ; CHECK-NEXT:    and.c %r3, %r4, %r3
-; CHECK-NEXT:    and.c %r4, %r0, %r5
+; CHECK-NEXT:    and.c %r4, %r0, %r6
 ; CHECK-NEXT:    or %r3, %r2, %r3
-; CHECK-NEXT:    or %r2, %r6, %r4
+; CHECK-NEXT:    or %r2, %r5, %r4
 ; CHECK-NEXT:    jmp %r1
   %r = call i64 @llvm.cttz.i64(i64 %a, i1 false)
   ret i64 %r

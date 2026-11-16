@@ -442,6 +442,9 @@ let Predicates = [MC88110], DecoderNamespace = "MC88110" in {
 
 defm : BinaryOpPat<"ADDU", add>;
 defm : BinaryOpPat<"SUBU", sub>;
+// x + (-C) with 0 < C < 65536 is x - C.
+def : Pat<(add GPROpnd:$rs1, simm16Neg:$imm),
+          (SUBUri GPROpnd:$rs1, (NEG16 i32:$imm))>;
 defm : BinaryOpPat<"MULU", mul>;
 defm : BinaryOpPat<"DIVU", udiv>;
 defm : BinaryOpPat<"DIVS", sdiv>;

@@ -79,7 +79,8 @@ define i32 @f8(i32 %a, i32 %b) {
 ; CHECK-LABEL: f8:
 ; CHECK:       | %bb.0:
 ; CHECK-NEXT:    subu.co %r2, %r0, %r2
-; CHECK-NEXT:    addu.ci %r2, %r0, %r0
+; CHECK-NEXT:    subu.ci %r2, %r0, %r0
+; CHECK-NEXT:    subu %r2, %r0, %r2
 ; CHECK-NEXT:    addu %r2, %r2, %r3
 ; CHECK-NEXT:    jmp %r1
   %res = call { i32, i1 } @llvm.usub.with.overflow.i32(i32 0, i32 %a)
@@ -187,9 +188,11 @@ define i32 @f16(i32 %a, i32 %b, i32 %c, i32 %d) {
 ; CHECK-LABEL: f16:
 ; CHECK:       | %bb.0:
 ; CHECK-NEXT:    subu.co %r2, %r0, %r2
-; CHECK-NEXT:    addu.ci %r2, %r0, %r0
+; CHECK-NEXT:    subu.ci %r2, %r0, %r0
+; CHECK-NEXT:    subu %r2, %r0, %r2
 ; CHECK-NEXT:    subu.co %r3, %r0, %r3
-; CHECK-NEXT:    addu.ci %r3, %r0, %r0
+; CHECK-NEXT:    subu.ci %r3, %r0, %r0
+; CHECK-NEXT:    subu %r3, %r0, %r3
 ; CHECK-NEXT:    addu %r2, %r2, %r4
 ; CHECK-NEXT:    addu %r3, %r3, %r5
 ; CHECK-NEXT:    mulu %r2, %r2, %r3

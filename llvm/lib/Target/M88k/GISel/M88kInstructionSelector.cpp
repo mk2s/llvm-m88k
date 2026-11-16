@@ -1047,12 +1047,26 @@ bool M88kInstructionSelector::selectAddSubWithCarry(MachineInstr &I,
       // Copy the carry flag into bit 0 of the register. For a subtract, the
       // generic carry-out is the borrow, which is the inverted hardware carry
       // flag: 0 - 0 - borrow = 0 + ~0 + carry is -1 for a borrow and 0
-      // otherwise.
-      MI = BuildMI(MBB, I, I.getDebugLoc(),
-                   TII.get(IsSub ? M88k::SUBUrrci : M88k::ADDUrrci),
-                   CarryOutReg)
-               .addReg(M88k::R0)
-               .addReg(M88k::R0);
+      // otherwise. Negate that to get the 0/1 value expected by the users of
+      // the generic carry-out (e.g. a G_ADD of the zero-extended borrow).
+      if (IsSub) {
+        Register MinusBorrowReg = MRI.createVirtualRegister(&M88k::GPRRegClass);
+        MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::SUBUrrci),
+                     MinusBorrowReg)
+                 .addReg(M88k::R0)
+                 .addReg(M88k::R0);
+        if (!constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI))
+          return false;
+        MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::SUBUrr),
+                     CarryOutReg)
+                 .addReg(M88k::R0)
+                 .addReg(MinusBorrowReg);
+      } else {
+        MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ADDUrrci),
+                     CarryOutReg)
+                 .addReg(M88k::R0)
+                 .addReg(M88k::R0);
+      }
     }
   }
   I.eraseFromParent();
