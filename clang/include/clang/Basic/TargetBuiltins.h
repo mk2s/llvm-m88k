@@ -114,8 +114,9 @@ namespace clang {
   namespace M88k {
   enum {
     LastTIBuiltin = clang::Builtin::FirstTSBuiltin - 1,
-  #define BUILTIN(ID, TYPE, ATTRS) BI##ID,
-  #include "clang/Basic/BuiltinsM88k.inc"
+#define GET_BUILTIN_ENUMERATORS
+#include "clang/Basic/BuiltinsM88k.inc"
+#undef GET_BUILTIN_ENUMERATORS
     LastTSBuiltin
   };
   }

@@ -936,7 +936,9 @@ bool M88kInstructionSelector::selectExt(MachineInstr &I, MachineBasicBlock &MBB,
   // Matches xEXT of ICMP.
   MachineInstr *MI = nullptr;
   Register DstReg = I.getOperand(0).getReg();
-  Register SrcReg = I.getOperand(1).getReg();
+  // Look through copies of the s1 compare result, e.g. those left behind
+  // when the legalizer narrows a 64-bit G_ICMP.
+  Register SrcReg = getSrcRegIgnoringCopies(I.getOperand(1).getReg(), MRI);
   const unsigned NewOpc =
       I.getOpcode() == TargetOpcode::G_SEXT ? M88k::EXTrwo : M88k::EXTUrwo;
   CmpInst::Predicate Pred;
