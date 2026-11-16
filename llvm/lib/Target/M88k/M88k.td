@@ -22,6 +22,10 @@ include "llvm/Target/Target.td"
 def FeatureGraphics : SubtargetFeature<"graphics", "HasGraphics", "true",
                                        "has graphics instructions", []>;
 
+def FeatureGNUAsm   : SubtargetFeature<"gnu-asm", "UseGNUAsm", "true",
+                                       "Accept GNU as syntax (bare registers, "
+                                       "hi16/lo16, undotted directives)", []>;
+
 def Proc88000       : SubtargetFeature<"mc88000", "M88kProc", "MC88000",
                                        "Generic 88000 processor", []>;
 def Proc88100       : SubtargetFeature<"mc88100", "M88kProc", "MC88100",

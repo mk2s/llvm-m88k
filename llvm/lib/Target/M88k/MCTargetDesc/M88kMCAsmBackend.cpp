@@ -200,8 +200,10 @@ bool M88kMCAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,
   if ((Count % 4) != 0)
     return false;
 
-  for (uint64_t I = 0; I != Count; ++I)
-    OS << "\xf4\x00\x58\x00"; // or %r0,%r0,%r0
+  // or %r0,%r0,%r0.  Write whole words; streaming a C string would stop at
+  // the embedded NUL.
+  for (uint64_t I = 0; I != Count / 4; ++I)
+    OS.write("\xf4\x00\x58\x00", 4);
 
   return true;
 }

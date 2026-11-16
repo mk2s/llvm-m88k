@@ -99,7 +99,9 @@ static M88k::FixupKind fixupKind(const MCExpr *Expr) {
       return M88k::FK_88K_LO;
     }
   }
-  return M88k::FixupKind(0);
+  // Any other expression (e.g. 0xffff & (sym - . - 4), accepted in GNU
+  // syntax mode) is a 16-bit absolute value resolved at layout time.
+  return M88k::FK_88K_LO;
 }
 
 unsigned
@@ -114,8 +116,6 @@ M88kMCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   // MO must be an expression
   assert(MO.isExpr() && "Expected MCExpr");
   const MCExpr *Expr = MO.getExpr();
-
-  assert(isa<M88kMCExpr>(Expr) && "Expected M88kMCExpr");
 
   // All instructions follow the pattern that the expr has an offset of 2 from
   // the begin of the instruction.
