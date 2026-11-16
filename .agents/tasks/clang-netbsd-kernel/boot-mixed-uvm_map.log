@@ -1,0 +1,26 @@
+# Mixed link: GCC-built uvm_map.o (GENERIC/uvm_map.o) + GCC move*.o (libkern __movstr helpers) into the otherwise all-clang kernel
+# build: build.sh EXTRA_OBJ=/tmp/movstr-all.o netbsd ; boot: boot-nono.sh
+Loaded initial symtab at 0x1b0fe4, strtab at 0x1c98fc, # entries 5947
+Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005
+    The NetBSD Foundation, Inc.  All rights reserved.
+Copyright (c) 1982, 1986, 1989, 1991, 1993
+    The Regents of the University of California.  All rights reserved.
+
+kernel misaligned access exception @ 0x00125462
+
+Trap type 4, v = 0x125460, frame 0x19bdb0
+R00-05: 0x00000000  0x0012532c  0x001b04a8  0x00000000  0x001b04a8  0x0019bf24
+R06-11: 0x0019beb4  0xffffffff  0x00000000  0x00000001  0x00000000  0x00000001
+R12-17: 0x00000668  0x00190000  0x001a6b74  0x00000000  0x00000000  0x0037b000
+R18-23: 0x00000000  0x00000000  0x00011727  0x001b0474  0x001b0470  0x20000000
+R24-29: 0x001b0528  0x00000007  0x00000000  0x00000000  0x0ccccccc  0x0ccccccc
+R30-31: 0x0019bf50  0x0019beb0
+sxip 125462 snip 125466 sfip 12546a
+fpsr c8b34 fpcr 37b000 epsr 80000012 ssbr 0
+fpecr 19be90 fphs1 c76cc fpls1 0 fphs2 37b000 fpls2 ffffffff
+fppt ffffffff fprh 11727 fprl 1b0474 fpit 1b0470
+vector 4 mask 7 mode 4 scratch1 1643cc cpu 0x1a6ca0
+panic: Misaligned Access
+Stopped in pid 0.1 () at        netbsd:cpu_Debugger:            tb0     0, r0, 0
+x84
+db> 

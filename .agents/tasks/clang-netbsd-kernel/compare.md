@@ -64,7 +64,7 @@ Extra in clang: none. `llvm-nm -u netbsd`: 0 lines.
 
 ## ABI review
 
-* Calling convention: LLVM M88k CSR set is r1, r14-r25, r30; r28/r29 reserved, r31 SP (M88kCallingConv.td / M88kRegisterInfo.cpp) which matches the SYS-V m88k ABI used by GCC and by `PCB_R14..PCB_R30` saved in cpu_switch/`eh_common.S`.
+* Calling convention: LLVM M88k CSR set is r1, r14-r25, r30; r28/r29 reserved, r31 SP (M88kCallingConv.td / M88kRegisterInfo.cpp) which matches GCC's callee-saved/reserved register set and the `PCB_R14..PCB_R30` saved in cpu_switch/`eh_common.S`. The match covers only the register roles and struct layout (assym.h). Outgoing stack arguments (beyond r2-r9) and struct-by-value passing are NOT the same: GCC callees read stack arguments at incoming `r31+32`, clang at `r31+0` (README, Remaining risks). Hand asm was audited for this: see `abi-audit.md` (no asm path passes or reads stack arguments). Runtime evidence of the mismatch: `boot-mixed-uvm_map.log`.
 * Hand-written asm (locore.S, eh.S, arch/m88k/m88k/*.S, libkern bcopy/bzero/memcpy/setjmp): assembled by clang's integrated assembler without errors (all 284 files OK). The assembler does no delay-slot reordering, as GNU as `-O0`. Offsets used by asm come from assym.h which is identical to the GCC one, so struct layout (lwp, pcb, cpu_info, exception frame) agrees between the two compilers.
 * Inline asm (arch/m88k/include/{asm_macro,lock,mmu,cpu,db_machdep}.h, boot fault.c, sig_machdep.c, m8820x_machdep.c): all compile; constraints used are simple `r`, `i`, `0`.  Not verified at run time; the pipeline flush string (`FLUSH_PIPELINE_STRING`) is emitted verbatim.
 * Risks to check at boot (FEAT-003):
