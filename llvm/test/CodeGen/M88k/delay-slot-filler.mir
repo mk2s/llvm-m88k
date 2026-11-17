@@ -295,3 +295,90 @@ body:             |
     $r2 = ORri $r0, 0
     JMP $r1, implicit $r2
 ...
+---
+# CFI directives are skipped when searching a filler, so the code does not
+# depend on whether CFI is emitted. A frame setup instruction moved into the
+# delay slot takes the CFI directives which describe its effect along: they
+# move behind the delay slot, which is the start of the layout successor if the
+# instruction with the delay slot is a terminator.
+name:            cfi
+alignment:       4
+legalized:       true
+regBankSelected: true
+selected:        true
+tracksRegLiveness: true
+tracksDebugUserValues: true
+liveins:
+  - { reg: '$r2' }
+  - { reg: '$r1' }
+  - { reg: '$r30' }
+frameInfo:
+  maxAlignment:    1
+  maxCallFrameSize: 0
+machineFunctionInfo: {}
+body:             |
+  bb.0:
+    successors: %bb.1, %bb.2
+    liveins: $r1, $r2, $r30
+
+    $r31 = frame-setup SUBUri $r31, 16
+    frame-setup CFI_INSTRUCTION def_cfa_offset 16
+    frame-setup STriw killed $r30, $r31, 0
+    frame-setup CFI_INSTRUCTION offset $r30, -16
+    $r30 = frame-setup ADDUri $r31, 0
+    frame-setup CFI_INSTRUCTION def_cfa $r30, 16
+    BB1 0, renamable $r2, %bb.2
+    ; CHECK:      frame-setup STriw killed $r30, $r31, 0
+    ; CHECK-NEXT: frame-setup CFI_INSTRUCTION offset $r30, -16
+    ; CHECK-NEXT: BB1n 0, renamable $r2, %bb.2 {
+    ; CHECK-NEXT:   $r30 = frame-setup ADDUri $r31, 0
+    ; CHECK-NEXT: }
+    ; CHECK:      bb.1:
+    ; CHECK-NEXT: liveins: $r1
+    ; CHECK-NOT:  {{^ *}}$r2
+    ; CHECK:      frame-setup CFI_INSTRUCTION def_cfa $r30, 16
+    ; CHECK-NEXT: JMPn $r1, implicit $r2 {
+    ; CHECK-NEXT:   $r2 = ORri $r0, 1
+
+  bb.1:
+    liveins: $r1
+
+    $r2 = ORri $r0, 1
+    JMP $r1, implicit $r2
+
+  bb.2:
+    liveins: $r1
+
+    $r2 = ORri $r0, 0
+    JMP $r1, implicit $r2
+...
+---
+# A CFI directive between a non frame setup filler and the branch stays where
+# it is.
+name:            cfi-body
+alignment:       4
+legalized:       true
+regBankSelected: true
+selected:        true
+tracksRegLiveness: true
+tracksDebugUserValues: true
+liveins:
+  - { reg: '$r2' }
+  - { reg: '$r3' }
+  - { reg: '$r1' }
+frameInfo:
+  maxAlignment:    1
+  maxCallFrameSize: 0
+machineFunctionInfo: {}
+body:             |
+  bb.0:
+    liveins: $r1, $r2, $r3
+
+    renamable $r2 = ORrr killed renamable $r2, killed renamable $r3
+    CFI_INSTRUCTION def_cfa_offset 0
+    JMP $r1, implicit $r2
+    ; CHECK:      CFI_INSTRUCTION def_cfa_offset 0
+    ; CHECK-NEXT: JMPn $r1, implicit $r2 {
+    ; CHECK-NEXT:   renamable $r2 = ORrr killed renamable $r2, killed renamable $r3
+    ; CHECK-NEXT: }
+...

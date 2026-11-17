@@ -35,6 +35,9 @@ static MCAsmInfo *createM88kMCAsmInfo(const MCRegisterInfo &MRI,
                                       const Triple &TT,
                                       const MCTargetOptions &Options) {
   MCAsmInfo *MAI = new M88kMCAsmInfo(TT);
+  // On function entry the CFA is the stack pointer r31.
+  unsigned SP = MRI.getDwarfRegNum(M88k::R31, true);
+  MAI->addInitialFrameState(MCCFIInstruction::cfiDefCfa(nullptr, SP, 0));
   return MAI;
 }
 

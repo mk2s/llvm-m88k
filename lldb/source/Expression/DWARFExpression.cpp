@@ -1972,7 +1972,20 @@ llvm::Expected<Value> DWARFExpression::Evaluate(
             assert(ap_int.getBitWidth() >= bit_size);
             llvm::ArrayRef<uint64_t> buf{ap_int.getRawData(),
                                          ap_int.getNumWords()};
-            curr_piece.GetScalar() = Scalar(llvm::APInt(bit_size, buf));
+            Scalar piece_scalar(llvm::APInt(bit_size, buf));
+            // The pieces are concatenated in target memory order. Store the
+            // bytes of this piece in the byte order of the target, as for a
+            // piece read from memory. Appending the Scalar itself would use
+            // the host byte order, which is wrong for big-endian targets on a
+            // little-endian host.
+            if (curr_piece.ResizeData(piece_byte_size) != piece_byte_size ||
+                piece_scalar.GetAsMemoryData(curr_piece.GetBuffer().GetBytes(),
+                                             piece_byte_size,
+                                             opcodes.GetByteOrder(),
+                                             error) != piece_byte_size)
+              return llvm::createStringError(
+                  "failed to store %" PRIu64 " bytes of a scalar piece",
+                  piece_byte_size);
           } break;
           }
 

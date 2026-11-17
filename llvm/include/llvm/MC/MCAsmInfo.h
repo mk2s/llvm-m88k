@@ -370,6 +370,10 @@ protected:
   /// True if target uses CFI unwind information for other purposes than EH
   /// (debugging / sanitizers) when `ExceptionsType == ExceptionHandling::None`.
   bool UsesCFIWithoutEH = false;
+  /// True if target emits CFI into .debug_frame for debugging even though its
+  /// exception handling does not use CFI (e.g. SjLj).  Unlike
+  /// UsesCFIWithoutEH, this never causes .eh_frame to be emitted.
+  bool UsesCFIForDebug = false;
 
   /// Windows exception handling data (.pdata) encoding.  Defaults to Invalid.
   WinEH::EncodingType WinEHEncodingType = WinEH::EncodingType::Invalid;
@@ -646,6 +650,7 @@ public:
     ExceptionsType = EH;
   }
 
+  bool usesCFIForDebug() const { return UsesCFIForDebug; }
   bool usesCFIWithoutEH() const {
     return ExceptionsType == ExceptionHandling::None && UsesCFIWithoutEH;
   }

@@ -144,6 +144,10 @@ void M88kInstPrinter::printPCRelOperand(const MCInst *MI, uint64_t Address,
     MO.getExpr()->print(O, &MAI);
 }
 
+void M88kInstPrinter::printRegName(raw_ostream &OS, MCRegister Reg) {
+  OS << '%' << getRegisterName(Reg);
+}
+
 void M88kInstPrinter::printInst(const MCInst *MI, uint64_t Address,
                                 StringRef Annot, const MCSubtargetInfo &STI,
                                 raw_ostream &O) {
