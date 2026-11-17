@@ -1936,13 +1936,23 @@ llvm::Expected<Value> DWARFExpression::Evaluate(
                   piece_byte_size,
                   (uint64_t)curr_piece_source_value.GetScalar().GetByteSize());
             }
-
             // We have seen a case where we have expression like:
             //      DW_OP_lit0, DW_OP_stack_value, DW_OP_piece 0x28
             // here we are assuming the compiler was trying to zero
             // extend the value that we should append to the buffer.
             scalar.TruncOrExtendTo(bit_size, /*sign=*/false);
-            curr_piece.GetScalar() = scalar;
+            // The pieces are concatenated in target memory order. Store the
+            // bytes of this piece in the byte order of the target, as for a
+            // piece read from memory. Appending the Scalar itself would use
+            // the host byte order, which is wrong for big-endian targets on a
+            // little-endian host.
+            if (curr_piece.ResizeData(piece_byte_size) != piece_byte_size ||
+                scalar.GetAsMemoryData(curr_piece.GetBuffer().GetBytes(),
+                                       piece_byte_size, opcodes.GetByteOrder(),
+                                       error) != piece_byte_size)
+              return llvm::createStringError(
+                  "failed to store %" PRIu64 " bytes of a scalar piece",
+                  piece_byte_size);
           } break;
           }
 

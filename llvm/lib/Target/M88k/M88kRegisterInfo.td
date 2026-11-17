@@ -38,7 +38,7 @@ let Namespace = "M88k" in {
 // General-purpose registers.
 foreach I = 0-31 in {
   let isConstant = !eq(I, 0) in
-    def R#I : M88kReg<I, "r"#I>;
+    def R#I : M88kReg<I, "r"#I>, DwarfRegNum<[I]>;
 }
 
 // The allocation order of the registers is influenced by the use in the ABI.
@@ -108,7 +108,7 @@ def GPR64Opnd : M88kRegisterOperand<GPR64>;
 // Extended (floating point) registers.
 foreach I = 0-31 in {
   let isConstant = !eq(I, 0) in
-    def X#I : M88kReg<I, "x"#I>;
+    def X#I : M88kReg<I, "x"#I>, DwarfRegNum<[!add(I, 32)]>;
 }
 
 def XR : M88kRegisterClass<[f32, f64, f80], 128, 32,

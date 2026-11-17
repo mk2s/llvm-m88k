@@ -34,6 +34,10 @@ class LLVM_LIBRARY_VISIBILITY DwarfCFIException : public EHStreamer {
   /// Per-function flag to indicate if frame CFI info should be emitted.
   bool shouldEmitCFI = false;
 
+  /// Per-function flag to indicate if the CFI is only emitted for debugging
+  /// (into .debug_frame), without personality or LSDA.
+  bool shouldEmitCFIForDebugOnly = false;
+
   /// Per-module flag to indicate if .cfi_section has beeen emitted.
   bool hasEmittedCFISections = false;
 

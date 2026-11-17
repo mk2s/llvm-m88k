@@ -36,6 +36,24 @@ static std::vector<DynamicRegisterInfo::Register> GetRegisters_aarch64() {
   return registers;
 }
 
+// Register layout of the 'g' packet used by m88k stubs: r0-r31, the
+// execution pc (shadow xip), and the exception-time control registers.
+static std::vector<DynamicRegisterInfo::Register> GetRegisters_m88k() {
+  ConstString empty_alt_name;
+  ConstString reg_set{"general purpose registers"};
+
+  std::vector<DynamicRegisterInfo::Register> registers{
+      R32(r0),   R32(r1),   R32(r2),  R32(r3),  R32(r4),  R32(r5),
+      R32(r6),   R32(r7),   R32(r8),  R32(r9),  R32(r10), R32(r11),
+      R32(r12),  R32(r13),  R32(r14), R32(r15), R32(r16), R32(r17),
+      R32(r18),  R32(r19),  R32(r20), R32(r21), R32(r22), R32(r23),
+      R32(r24),  R32(r25),  R32(r26), R32(r27), R32(r28), R32(r29),
+      R32(r30),  R32(r31),  R32(pc),  R32(epsr), R32(ssbr), R32(snip),
+      R32(sfip), R32(vbr)};
+
+  return registers;
+}
+
 static std::vector<DynamicRegisterInfo::Register> GetRegisters_msp430() {
   ConstString empty_alt_name;
   ConstString reg_set{"general purpose registers"};
@@ -84,6 +102,8 @@ GetFallbackRegisters(const ArchSpec &arch_to_use) {
   switch (arch_to_use.GetMachine()) {
   case llvm::Triple::aarch64:
     return GetRegisters_aarch64();
+  case llvm::Triple::m88k:
+    return GetRegisters_m88k();
   case llvm::Triple::msp430:
     return GetRegisters_msp430();
   case llvm::Triple::x86:

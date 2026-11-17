@@ -22,6 +22,8 @@ M88kMCAsmInfo::M88kMCAsmInfo(const Triple &TT) {
   ZeroDirective = "\t.space\t";
   Data64bitsDirective = "\t.quad\t";
   UsesELFSectionDirectiveForBSS = true;
-  SupportsDebugInformation = false;
+  SupportsDebugInformation = true;
   ExceptionsType = ExceptionHandling::SjLj;
+  // SjLj EH does not use CFI. Emit CFI into .debug_frame for debuggers.
+  UsesCFIForDebug = true;
 }

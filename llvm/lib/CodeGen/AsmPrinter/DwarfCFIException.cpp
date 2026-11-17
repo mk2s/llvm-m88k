@@ -97,6 +97,12 @@ void DwarfCFIException::beginFunction(const MachineFunction *MF) {
         MAI.usesCFIForEH() && (shouldEmitPersonality || shouldEmitMoves);
   else
     shouldEmitCFI = Asm->usesCFIWithoutEH() && shouldEmitMoves;
+  // The target may emit CFI for debugging only.
+  shouldEmitCFIForDebugOnly =
+      !shouldEmitCFI && MAI.usesCFIForDebug() &&
+      Asm->getFunctionCFISectionType(*MF) == AsmPrinter::CFISection::Debug;
+  if (shouldEmitCFIForDebugOnly)
+    shouldEmitCFI = true;
 }
 
 void DwarfCFIException::beginBasicBlockSection(const MachineBasicBlock &MBB) {
@@ -120,7 +126,7 @@ void DwarfCFIException::beginBasicBlockSection(const MachineBasicBlock &MBB) {
   Asm->OutStreamer->emitCFIStartProc(/*IsSimple=*/false);
 
   // Indicate personality routine, if any.
-  if (!shouldEmitPersonality)
+  if (!shouldEmitPersonality || shouldEmitCFIForDebugOnly)
     return;
 
   auto &F = MBB.getParent()->getFunction();

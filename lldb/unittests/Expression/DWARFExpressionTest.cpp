@@ -617,6 +617,27 @@ TEST(DWARFExpression, DW_OP_piece) {
       ExpectHostAddress(expected_host_buffer));
 }
 
+// Scalar pieces are concatenated in target memory order, also on a host with
+// a different byte order.
+TEST(DWARFExpression, DW_OP_piece_big_endian) {
+  const uint8_t expr[] = {DW_OP_const2u, 0x11, 0x22, DW_OP_piece, 2,
+                          DW_OP_const2u, 0x33, 0x44, DW_OP_piece, 2};
+  DataExtractor extractor(expr, sizeof(expr), lldb::eByteOrderBig,
+                          /*addr_size*/ 4);
+  llvm::Expected<Value> result = DWARFExpression::Evaluate(
+      /*exe_ctx*/ nullptr, /*reg_ctx*/ nullptr, /*module_sp*/ {}, extractor,
+      /*dwarf_cu*/ nullptr, lldb::eRegisterKindLLDB,
+      /*initial_value_ptr*/ nullptr, /*object_address_ptr*/ nullptr);
+  ASSERT_THAT_EXPECTED(result, llvm::Succeeded());
+  ASSERT_EQ(Value::ValueType::HostAddress, result->GetValueType());
+  DataBufferHeap &buf = result->GetBuffer();
+  ASSERT_EQ(4u, buf.GetByteSize());
+  EXPECT_EQ(0x11, buf.GetBytes()[0]);
+  EXPECT_EQ(0x22, buf.GetBytes()[1]);
+  EXPECT_EQ(0x33, buf.GetBytes()[2]);
+  EXPECT_EQ(0x44, buf.GetBytes()[3]);
+}
+
 TEST(DWARFExpression, DW_OP_implicit_value) {
   unsigned char bytes = 4;
 

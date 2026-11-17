@@ -14,6 +14,7 @@
 #include "M88kSubtarget.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -51,6 +52,11 @@ public:
   bool runOnMachineFunction(MachineFunction &MF) override;
 
   bool runOnMachineBasicBlock(MachineBasicBlock &MBB);
+
+  void moveCFIBehindDelaySlot(MachineBasicBlock &MBB,
+                              MachineBasicBlock::instr_iterator InstrWithSlot,
+                              MachineBasicBlock::instr_iterator Filler,
+                              ArrayRef<MachineInstr *> CFIs);
 
   bool findDelayInstr(MachineBasicBlock &MBB,
                       MachineBasicBlock::instr_iterator Slot,
@@ -115,8 +121,22 @@ bool M88kDelaySlotFiller::runOnMachineBasicBlock(MachineBasicBlock &MBB) {
       // Replace the opcode.
       I->setDesc(TII->get(Opc));
 
+      // A frame setup instruction may be moved past the CFI directives which
+      // describe its effect. Those directives are moved behind the delay slot,
+      // because the effect is only visible after the delay slot instruction.
+      // This is also correct for the other directives in the prologue: they
+      // describe the state of saved registers or of the CFA, and they stay
+      // valid if they are delayed until the end of the prologue.
+      SmallVector<MachineInstr *, 8> CFIs;
+      if (Filler->getFlag(MachineInstr::FrameSetup))
+        for (auto It = std::next(Filler); It != I; ++It)
+          if (It->isCFIInstruction())
+            CFIs.push_back(&*It);
+
       // Move the filler instruction into the delay slot position.
       MBB.splice(std::next(I), &MBB, Filler);
+      if (!CFIs.empty())
+        moveCFIBehindDelaySlot(MBB, I, Filler, CFIs);
 
       // Update statistic count and record the change.
       ++FilledSlots;
@@ -134,6 +154,31 @@ bool M88kDelaySlotFiller::runOnMachineBasicBlock(MachineBasicBlock &MBB) {
   return Changed;
 }
 
+// Move the CFI directives behind the delay slot instruction Filler of
+// InstrWithSlot. If InstrWithSlot is a terminator then the directives move to
+// the beginning of the layout successor, which starts at the address following
+// the delay slot. Without a layout successor the directives would describe no
+// instruction and are deleted.
+void M88kDelaySlotFiller::moveCFIBehindDelaySlot(
+    MachineBasicBlock &MBB, MachineBasicBlock::instr_iterator InstrWithSlot,
+    MachineBasicBlock::instr_iterator Filler,
+    ArrayRef<MachineInstr *> CFIs) {
+  if (!InstrWithSlot->isTerminator()) {
+    for (MachineInstr *CFI : llvm::reverse(CFIs))
+      MBB.splice(std::next(Filler), &MBB, CFI->getIterator());
+    return;
+  }
+  MachineFunction::iterator Next = std::next(MBB.getIterator());
+  if (Next == MBB.getParent()->end()) {
+    for (MachineInstr *CFI : CFIs)
+      CFI->eraseFromParent();
+    return;
+  }
+  MachineBasicBlock::instr_iterator Pos = Next->instr_begin();
+  for (MachineInstr *CFI : CFIs)
+    Next->splice(Pos, &MBB, CFI->getIterator());
+}
+
 bool M88kDelaySlotFiller::findDelayInstr(
     MachineBasicBlock &MBB, MachineBasicBlock::instr_iterator Slot,
     MachineBasicBlock::instr_iterator &Filler) {
@@ -149,6 +194,11 @@ bool M88kDelaySlotFiller::findDelayInstr(
        I != MBB.instr_rend(); ++I) {
     // Skip debug value.
     if (I->isDebugInstr())
+      continue;
+
+    // CFI directives do not occupy a slot. Skip them, so that the generated
+    // code does not depend on whether CFI is emitted.
+    if (I->isCFIInstruction())
       continue;
 
     // Convert to forward iterator.

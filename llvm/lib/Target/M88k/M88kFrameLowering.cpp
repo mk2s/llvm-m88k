@@ -21,10 +21,12 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/MC/MCDwarf.h"
 #include "llvm/CodeGen/Register.h"
 #include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/IR/DebugLoc.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
@@ -232,6 +234,17 @@ bool M88kFrameLowering::restoreCalleeSavedRegisters(
   return true;
 }
 
+// Emit a CFI instruction before MBBI.
+static void buildCFI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
+                     const DebugLoc &DL, const MCCFIInstruction &CFIInst) {
+  MachineFunction &MF = *MBB.getParent();
+  unsigned CFIIndex = MF.addFrameInst(CFIInst);
+  BuildMI(MBB, MBBI, DL,
+          MF.getSubtarget().getInstrInfo()->get(TargetOpcode::CFI_INSTRUCTION))
+      .addCFIIndex(CFIIndex)
+      .setMIFlag(MachineInstr::FrameSetup);
+}
+
 void M88kFrameLowering::emitPrologue(MachineFunction &MF,
                                      MachineBasicBlock &MBB) const {
   assert(&MF.front() == &MBB && "Shrink-wrapping not yet supported");
@@ -276,9 +289,53 @@ void M88kFrameLowering::emitPrologue(MachineFunction &MF,
           .setMIFlag(MachineInstr::FrameSetup);
     }
 
+    const MCRegisterInfo *MRI = MF.getContext().getRegisterInfo();
+    const TargetRegisterInfo *TRI = STI.getRegisterInfo();
+    // CFI is only emitted into .debug_frame (see M88kMCAsmInfo), so it is
+    // only needed with debug info.
+    bool NeedsCFI = MF.getTarget().Options.ForceDwarfFrameSection ||
+                    !MF.getFunction().getParent()->debug_compile_units().empty();
+
+    // CFA = r31 + StackSize after the stack allocation.
+    if (NeedsCFI)
+      buildCFI(MBB, MBBI, DL,
+               MCCFIInstruction::cfiDefCfaOffset(nullptr, StackSize));
+
     // Skip over the register spills.
-    while (MBBI->getFlag(MachineInstr::FrameSetup))
+    while (MBBI != MBB.end() && MBBI->getFlag(MachineInstr::FrameSetup))
       ++MBBI;
+
+    // Describe where the callee-saved registers were stored. The offsets of
+    // the spill slots are relative to the incoming stack pointer, which is the
+    // CFA. A register pair is stored with the even register at the lower
+    // address.
+    if (NeedsCFI) {
+      for (const CalleeSavedInfo &CS : MFI.getCalleeSavedInfo()) {
+        int64_t Off = MFI.getObjectOffset(CS.getFrameIdx());
+        Register Reg = CS.getReg();
+        // The spill slot of the return address is moved next to the slot of
+        // the previous frame pointer later, see
+        // processFunctionBeforeFrameIndicesReplaced().
+        if (Reg == M88k::R1 && FuncInfo->getFramePointerIndex())
+          Off = MFI.getObjectOffset(FuncInfo->getFramePointerIndex()) + 4;
+        if (M88k::GPR64RegClass.contains(Reg)) {
+          Register Hi = TRI->getSubReg(Reg, M88k::sub_hi);
+          Register Lo = TRI->getSubReg(Reg, M88k::sub_lo);
+          buildCFI(MBB, MBBI, DL,
+                   MCCFIInstruction::createOffset(
+                       nullptr, MRI->getDwarfRegNum(Hi, true), Off));
+          buildCFI(MBB, MBBI, DL,
+                   MCCFIInstruction::createOffset(
+                       nullptr, MRI->getDwarfRegNum(Lo, true), Off + 4));
+        } else {
+          int DwarfReg = MRI->getDwarfRegNum(Reg, true);
+          if (DwarfReg < 0)
+            continue;
+          buildCFI(MBB, MBBI, DL,
+                   MCCFIInstruction::createOffset(nullptr, DwarfReg, Off));
+        }
+      }
+    }
 
     if (SetupFP) {
       int64_t Offset =
@@ -290,6 +347,13 @@ void M88kFrameLowering::emitPrologue(MachineFunction &MF,
           .addReg(M88k::R31)
           .addImm(Offset)
           .setMIFlag(MachineInstr::FrameSetup);
+
+      // CFA = r30 + (StackSize - Offset) from here on.
+      if (NeedsCFI)
+        buildCFI(MBB, MBBI, DL,
+                 MCCFIInstruction::cfiDefCfa(
+                     nullptr, MRI->getDwarfRegNum(M88k::R30, true),
+                     StackSize - Offset));
     }
   }
 }

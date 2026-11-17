@@ -138,6 +138,22 @@ TEST(ArchSpecTest, TestSetTriple) {
   EXPECT_EQ(ArchSpec::eCore_msp430, AS.GetCore());
 
   AS = ArchSpec();
+  EXPECT_TRUE(AS.SetTriple("m88k-unknown-none-elf"));
+  EXPECT_EQ(llvm::Triple::m88k, AS.GetTriple().getArch());
+  EXPECT_STREQ("m88k", AS.GetArchitectureName());
+  EXPECT_EQ(ArchSpec::eCore_m88k, AS.GetCore());
+  EXPECT_EQ(lldb::eByteOrderBig, AS.GetByteOrder());
+  EXPECT_EQ(4u, AS.GetAddressByteSize());
+  EXPECT_EQ(4u, AS.GetMinimumOpcodeByteSize());
+  EXPECT_EQ(4u, AS.GetMaximumOpcodeByteSize());
+
+  AS = ArchSpec();
+  EXPECT_TRUE(AS.SetArchitecture(eArchTypeELF, llvm::ELF::EM_88K,
+                                 LLDB_INVALID_CPUTYPE, llvm::Triple::UnknownOS));
+  EXPECT_EQ(llvm::Triple::m88k, AS.GetTriple().getArch());
+  EXPECT_EQ(ArchSpec::eCore_m88k, AS.GetCore());
+
+  AS = ArchSpec();
   EXPECT_TRUE(AS.SetTriple("amd64-unknown-openbsd"));
   EXPECT_EQ(llvm::Triple::x86_64, AS.GetTriple().getArch());
   EXPECT_STREQ("amd64", AS.GetArchitectureName());

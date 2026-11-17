@@ -235,6 +235,7 @@ public:
     eCore_avr,
 
     eCore_wasm32,
+    eCore_m88k, // big endian Motorola 88000
 
     kNumCores,
 

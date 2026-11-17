@@ -2013,6 +2013,14 @@ size_t Platform::GetSoftwareBreakpointTrapOpcode(Target &target,
     trap_opcode_size = sizeof(g_hex_opcode);
   } break;
 
+  case llvm::Triple::m88k: {
+    // tb0 0,r0,504: trap to vector 504, the breakpoint vector used by the
+    // NCD 88k RSP stub.
+    static const uint8_t g_m88k_opcode[] = {0xf0, 0x00, 0xd1, 0xf8};
+    trap_opcode = g_m88k_opcode;
+    trap_opcode_size = sizeof(g_m88k_opcode);
+  } break;
+
   case llvm::Triple::msp430: {
     static const uint8_t g_msp430_opcode[] = {0x43, 0x43};
     trap_opcode = g_msp430_opcode;
