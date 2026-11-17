@@ -100,6 +100,9 @@ void M88kABIInfo::computeInfo(CGFunctionInfo &FI) const {
 RValue M88kABIInfo::EmitVAArg(CodeGen::CodeGenFunction &CGF,
                               CodeGen::Address VAListAddr, QualType Ty,
                               AggValueSlot Slot) const {
+  // FIXME: this differs from OpenBSD's GCC for structs and for argument lists
+  // beyond the registers, see llvm/lib/Target/M88k/KNOWN_ISSUES.md.
+  //
   // The va_list type is (88open BCS):
   // struct {
   //    int __va_arg;   // argument word index of the next argument
