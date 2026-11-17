@@ -16,18 +16,18 @@
 //
 // The IR is replaced with:
 //
-//   %usub = tail call {i32, i1} @llvm.usub.with.overflow.i32(i32 0,
-//                                                            i32 noundef %x)
-//   %res = extractvalue {i32, i1} %usub, 0
-//   %overbit = extractvalue {i32, i1} %usub, 1
-//   %over = zext i1 %overbit to i32
-//   %and = and i32 %res, %x
-//   %add = add i32 %and, %and
-//   %add2 = add i32 %add, %over
-//   %ff1 = tail call i32 @llvm.m88k.ff1(i32 %add2)
+//   %neg = sub i32 0, %x
+//   %and = and i32 %x, %neg                  ; isolate the lowest set bit
+//   %ff1 = tail call i32 @llvm.m88k.ff1(i32 %and)
+//   %add = add i32 %ff1, 1
+//   %nz = lshr i32 %ff1, 5                   ; ff1 is 32 only if %x is 0
+//   %mask = add i32 %nz, -1                  ; all ones if %x != 0, else 0
+//   %res = and i32 %add, %mask
 //
-// Together with a combiner pattern which folds the 2 add instructions together,
-// a better instruction sequence is generated.
+// ff1 returns the bit number of the most significant set bit, or 32 if no bit
+// is set. A previous version computed ff1(2 * (x & -x) + (x != 0)), which
+// is wrong for x == 0 (ff1(0) == 32, not 0) and for x == 0x80000000 (the
+// multiplication by 2 overflows, giving ff1(1) == 0 instead of 32).
 //
 //===----------------------------------------------------------------------===//
 
@@ -99,7 +99,6 @@ bool M88kFFS::runOnBasicBlock(BasicBlock &BB) {
   IRBuilder<> Builder(Ctx);
 
   Type *Int32Ty = Type::getInt32Ty(Ctx);
-  Constant *Int32Zero = ConstantInt::get(Int32Ty, 0);
 
   Value *Input;
   Instruction *Cttz = nullptr;
@@ -126,16 +125,15 @@ bool M88kFFS::runOnBasicBlock(BasicBlock &BB) {
 
       Builder.SetInsertPoint(Cttz);
 
-      auto *USub = Builder.CreateBinaryIntrinsic(Intrinsic::usub_with_overflow,
-                                                 Int32Zero, Input);
-      auto *Diff = Builder.CreateExtractValue(USub, 0);
-      auto *Overflow =
-          Builder.CreateZExt(Builder.CreateExtractValue(USub, 1), Int32Ty);
-      auto *And = Builder.CreateAnd(Diff, Input);
-      auto *Add = Builder.CreateAdd(Builder.CreateAdd(And, And), Overflow);
-      auto *FF1 = Builder.CreateIntrinsic(Int32Ty, Intrinsic::m88k_ff1, {Add});
-
-      I->replaceAllUsesWith(FF1);
+      auto *Neg = Builder.CreateNeg(Input);
+      auto *And = Builder.CreateAnd(Input, Neg);
+      auto *FF1 = Builder.CreateIntrinsic(Int32Ty, Intrinsic::m88k_ff1, {And});
+      auto *Plus1 = Builder.CreateAdd(FF1, ConstantInt::get(Int32Ty, 1));
+      auto *NotFound = Builder.CreateLShr(FF1, ConstantInt::get(Int32Ty, 5));
+      auto *Mask =
+          Builder.CreateAdd(NotFound, Constant::getAllOnesValue(Int32Ty));
+      auto *Res = Builder.CreateAnd(Plus1, Mask);
+      I->replaceAllUsesWith(Res);
 
       addToEraseList(Cttz, EraseList);
       Cttz = nullptr;
