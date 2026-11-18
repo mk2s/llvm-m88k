@@ -228,7 +228,7 @@ public:
   bool isPixelRot() const { return isImm(0, 60); }
   bool isCCode() const { return isImm(0, 31); }
 
-  void print(raw_ostream &OS) const override {
+  void print(raw_ostream &OS, const MCAsmInfo &) const override {
     switch (Kind) {
     case OpKind_Imm:
       OS << "Imm: " << getImm() << "\n";
@@ -534,7 +534,7 @@ bool M88kAsmParser::parseGNUDirective(StringRef Name, SMLoc NameLoc,
         return true;
       HasFill = true;
     }
-    if (!HasFill && Out.getCurrentSectionOnly()->useCodeAlign())
+    if (!HasFill && getContext().getAsmInfo()->useCodeAlign(*Out.getCurrentSectionOnly()))
       Out.emitCodeAlignment(Align(Alignment), &getSTI());
     else
       Out.emitValueToAlignment(Align(Alignment), Fill, 1);
