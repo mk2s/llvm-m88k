@@ -10232,7 +10232,7 @@ static TypedefDecl *CreateM88kBuiltinVaListDecl(const ASTContext *Context) {
   }
   VaListTagDecl->completeDefinition();
   Context->VaListTagDecl = VaListTagDecl;
-  QualType VaListTagType = Context->getRecordType(VaListTagDecl);
+  CanQualType VaListTagType = Context->getCanonicalTagType(VaListTagDecl);
 
   // } __builtin_va_list;
   return Context->buildImplicitTypedef(VaListTagType, "__builtin_va_list");
