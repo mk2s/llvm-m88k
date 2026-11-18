@@ -189,8 +189,8 @@ step_rt() {
     fi
     if cmake --build "$d" --target builtins -j "$JOBS" > "$LOGS/rt-$t.build.log" 2>&1; then
       rec "rt/$t/build PASS"
-      if cmake --install "$d" --component builtins > "$LOGS/rt-$t.install.log" 2>&1 ||
-         cmake --install "$d" > "$LOGS/rt-$t.install.log" 2>&1; then
+      # LLVM 22: "--component builtins" exits 0 but installs nothing, so install everything configured.
+      if cmake --install "$d" > "$LOGS/rt-$t.install.log" 2>&1; then
         rec "rt/$t/install PASS"
       else
         rec "rt/$t/install FAIL"
