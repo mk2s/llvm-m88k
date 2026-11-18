@@ -2,6 +2,12 @@
 ;
 ; Test floating point arithmetic.
 ;
+; Regression (found running Clang-built programs on OpenBSD luna88k): fpext(fadd float) was
+; selected as fadd.dss, which adds at double precision and skips the rounding to float
+; (0.1f * 3.0f printed 0.300000004 instead of 0.300000012). fptrunc(fadd double) was
+; selected as fadd.sdd, which rounds once instead of twice and can differ. Both are now an
+; operation in the source precision followed by a conversion.
+;
 ; RUN: llc < %s -mtriple=m88k-openbsd -mcpu=mc88100 -m88k-enable-delay-slot-filler=false | FileCheck --check-prefixes=CHECK,MC88100 %s
 ; RUN: llc < %s -mtriple=m88k-openbsd -mcpu=mc88110 -m88k-enable-delay-slot-filler=false | FileCheck --check-prefixes=CHECK,MC88110 %s
 
@@ -158,12 +164,21 @@ define float @fadd1(float %a, float %b) {
 }
 
 define float @fadd2(float %a, double %b) {
-; CHECK-LABEL: fadd2:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fadd.ssd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fadd2:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fadd.dsd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fadd2:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fadd.dsd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %a to double
   %sum = fadd double %ext, %b
   %trnc = fptrunc double %sum to float
@@ -171,12 +186,21 @@ define float @fadd2(float %a, double %b) {
 }
 
 define float @fadd3(double %a, float %b) {
-; CHECK-LABEL: fadd3:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    fadd.sds %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fadd3:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    fadd.dds %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fadd3:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    fadd.dds %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %b to double
   %sum = fadd double %a, %ext
   %trnc = fptrunc double %sum to float
@@ -184,14 +208,25 @@ define float @fadd3(double %a, float %b) {
 }
 
 define float @fadd4(double %a, double %b) {
-; CHECK-LABEL: fadd4:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fadd.sdd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fadd4:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fadd.ddd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fadd4:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fadd.ddd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fadd double %a, %b
   %trnc = fptrunc double %sum to float
   ret float %trnc
@@ -235,10 +270,17 @@ define double @fadd7(float %a, double %b) {
 }
 
 define double @fadd8(float %a, float %b) {
-; CHECK-LABEL: fadd8:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    fadd.dss %r2, %r2, %r3
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fadd8:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    fadd.sss %r2, %r2, %r3
+; MC88100-NEXT:    fsub.dss %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fadd8:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    fadd.sss %r2, %r2, %r3
+; MC88110-NEXT:    fcvt.ds %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fadd float %a, %b
   %ext = fpext float %sum to double
   ret double %ext
@@ -254,12 +296,21 @@ define float @fsub1(float %a, float %b) {
 }
 
 define float @fsub2(float %a, double %b) {
-; CHECK-LABEL: fsub2:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fsub.ssd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fsub2:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fsub.dsd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fsub2:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fsub.dsd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %a to double
   %sum = fsub double %ext, %b
   %trnc = fptrunc double %sum to float
@@ -267,12 +318,21 @@ define float @fsub2(float %a, double %b) {
 }
 
 define float @fsub3(double %a, float %b) {
-; CHECK-LABEL: fsub3:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    fsub.sds %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fsub3:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    fsub.dds %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fsub3:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    fsub.dds %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %b to double
   %sum = fsub double %a, %ext
   %trnc = fptrunc double %sum to float
@@ -280,14 +340,25 @@ define float @fsub3(double %a, float %b) {
 }
 
 define float @fsub4(double %a, double %b) {
-; CHECK-LABEL: fsub4:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fsub.sdd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fsub4:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fsub.ddd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fsub4:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fsub.ddd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fsub double %a, %b
   %trnc = fptrunc double %sum to float
   ret float %trnc
@@ -331,10 +402,17 @@ define double @fsub7(float %a, double %b) {
 }
 
 define double @fsub8(float %a, float %b) {
-; CHECK-LABEL: fsub8:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    fsub.dss %r2, %r2, %r3
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fsub8:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    fsub.sss %r2, %r2, %r3
+; MC88100-NEXT:    fsub.dss %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fsub8:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    fsub.sss %r2, %r2, %r3
+; MC88110-NEXT:    fcvt.ds %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fsub float %a, %b
   %ext = fpext float %sum to double
   ret double %ext
@@ -350,12 +428,21 @@ define float @fmul1(float %a, float %b) {
 }
 
 define float @fmul2(float %a, double %b) {
-; CHECK-LABEL: fmul2:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fmul.ssd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fmul2:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fmul.dsd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fmul2:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fmul.dsd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %a to double
   %sum = fmul double %ext, %b
   %trnc = fptrunc double %sum to float
@@ -363,12 +450,21 @@ define float @fmul2(float %a, double %b) {
 }
 
 define float @fmul3(double %a, float %b) {
-; CHECK-LABEL: fmul3:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    fmul.sds %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fmul3:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    fmul.dds %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fmul3:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    fmul.dds %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %b to double
   %sum = fmul double %a, %ext
   %trnc = fptrunc double %sum to float
@@ -376,14 +472,25 @@ define float @fmul3(double %a, float %b) {
 }
 
 define float @fmul4(double %a, double %b) {
-; CHECK-LABEL: fmul4:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fmul.sdd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fmul4:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fmul.ddd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fmul4:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fmul.ddd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fmul double %a, %b
   %trnc = fptrunc double %sum to float
   ret float %trnc
@@ -427,10 +534,17 @@ define double @fmul7(float %a, double %b) {
 }
 
 define double @fmul8(float %a, float %b) {
-; CHECK-LABEL: fmul8:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    fmul.dss %r2, %r2, %r3
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fmul8:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    fmul.sss %r2, %r2, %r3
+; MC88100-NEXT:    fsub.dss %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fmul8:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    fmul.sss %r2, %r2, %r3
+; MC88110-NEXT:    fcvt.ds %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fmul float %a, %b
   %ext = fpext float %sum to double
   ret double %ext
@@ -446,12 +560,21 @@ define float @fdiv1(float %a, float %b) {
 }
 
 define float @fdiv2(float %a, double %b) {
-; CHECK-LABEL: fdiv2:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fdiv.ssd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fdiv2:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fdiv.dsd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fdiv2:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fdiv.dsd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %a to double
   %sum = fdiv double %ext, %b
   %trnc = fptrunc double %sum to float
@@ -459,12 +582,21 @@ define float @fdiv2(float %a, double %b) {
 }
 
 define float @fdiv3(double %a, float %b) {
-; CHECK-LABEL: fdiv3:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    fdiv.sds %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fdiv3:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    fdiv.dds %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fdiv3:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    fdiv.dds %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %ext = fpext float %b to double
   %sum = fdiv double %a, %ext
   %trnc = fptrunc double %sum to float
@@ -472,14 +604,25 @@ define float @fdiv3(double %a, float %b) {
 }
 
 define float @fdiv4(double %a, double %b) {
-; CHECK-LABEL: fdiv4:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
-; CHECK-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
-; CHECK-NEXT:    fdiv.sdd %r2, %r2, %r4
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fdiv4:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88100-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88100-NEXT:    fdiv.ddd %r2, %r2, %r4
+; MC88100-NEXT:    fsub.sds %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fdiv4:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    | kill: def $r3 killed $r3 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r2 killed $r2 killed $r2_r3 def $r2_r3
+; MC88110-NEXT:    | kill: def $r5 killed $r5 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    | kill: def $r4 killed $r4 killed $r4_r5 def $r4_r5
+; MC88110-NEXT:    fdiv.ddd %r2, %r2, %r4
+; MC88110-NEXT:    fcvt.sd %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fdiv double %a, %b
   %trnc = fptrunc double %sum to float
   ret float %trnc
@@ -523,10 +666,17 @@ define double @fdiv7(float %a, double %b) {
 }
 
 define double @fdiv8(float %a, float %b) {
-; CHECK-LABEL: fdiv8:
-; CHECK:       | %bb.0:
-; CHECK-NEXT:    fdiv.dss %r2, %r2, %r3
-; CHECK-NEXT:    jmp %r1
+; MC88100-LABEL: fdiv8:
+; MC88100:       | %bb.0:
+; MC88100-NEXT:    fdiv.sss %r2, %r2, %r3
+; MC88100-NEXT:    fsub.dss %r2, %r2, %r0
+; MC88100-NEXT:    jmp %r1
+;
+; MC88110-LABEL: fdiv8:
+; MC88110:       | %bb.0:
+; MC88110-NEXT:    fdiv.sss %r2, %r2, %r3
+; MC88110-NEXT:    fcvt.ds %r2, %r2
+; MC88110-NEXT:    jmp %r1
   %sum = fdiv float %a, %b
   %ext = fpext float %sum to double
   ret double %ext
