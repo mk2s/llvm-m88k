@@ -1,0 +1,4 @@
+(lldb) version
+lldb version 21.0.0git (https://github.com/redstar/llvm-m88k.git revision 8e44cad8dc9ea03c410acb10bdec4697d778e9a9)
+  clang revision 8e44cad8dc9ea03c410acb10bdec4697d778e9a9
+  llvm revision 8e44cad8dc9ea03c410acb10bdec4697d778e9a9

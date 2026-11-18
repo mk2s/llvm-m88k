@@ -1,0 +1,286 @@
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find lli in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-install-name-tool in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-bitcode-strip in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find dsymutil in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find lli in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find lli-child-target in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-addr2line in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-bcanalyzer in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-bitcode-strip in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-cgdata in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-cov in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-ctxprof-util in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-cxxdump in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-cvtres in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-debuginfod-find in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-debuginfo-analyzer in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-diff in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-dwarfutil in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-dwp in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-dlltool in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-exegesis in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-extract in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-isel-fuzzer in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-ifs in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-install-name-tool in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-jitlink in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-opt-fuzzer in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-lib in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-link in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-lto in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-lto2 in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-mca in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-modextract in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-otool in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-pdbutil in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-profdata in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-profgen in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-rc in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-rtdyld in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-sim in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-size in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-split in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-stress in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-strings in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-readtapi in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-undname in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-windres in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-c-test in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-cxxfilt in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-xray in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find yaml2obj in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find obj2yaml in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find yaml-bench in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find verify-uselistorder in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find bugpoint in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-symbolizer in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find sancov in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find sanstats in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-remarkutil in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using clang: /home/mk2s/Documents/llvm-m88k/build/bin/clang
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:670: note: No default target triple was found, some tests may fail as a result.
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find apinotes-test in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find c-index-test in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-diff in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-format in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-repl in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-offload-packager in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-scan-deps in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-installapi in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-ifs in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find yaml2obj in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-linker-wrapper in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-nvlink-wrapper in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-sycl-linker in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-lto in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-lto2 in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-profdata in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-readtapi in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find clang-check in /home/mk2s/Documents/llvm-m88k/build/bin:/home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using ld.lld: /home/mk2s/Documents/llvm-m88k/build/bin/ld.lld
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using lld-link: /home/mk2s/Documents/llvm-m88k/build/bin/lld-link
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using ld64.lld: /home/mk2s/Documents/llvm-m88k/build/bin/ld64.lld
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using wasm-ld: /home/mk2s/Documents/llvm-m88k/build/bin/wasm-ld
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using ld.lld: /home/mk2s/Documents/llvm-m88k/build/bin/ld.lld
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using lld-link: /home/mk2s/Documents/llvm-m88k/build/bin/lld-link
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using ld64.lld: /home/mk2s/Documents/llvm-m88k/build/bin/ld64.lld
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/config.py:506: note: using wasm-ld: /home/mk2s/Documents/llvm-m88k/build/bin/wasm-ld
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-cgdata in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-otool in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-pdbutil in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find llvm-profdata in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find obj2yaml in /home/mk2s/Documents/llvm-m88k/build/bin
+llvm-lit: /home/mk2s/Documents/llvm-m88k/llvm/utils/lit/lit/llvm/subst.py:126: note: Did not find yaml2obj in /home/mk2s/Documents/llvm-m88k/build/bin
+-- Testing: 187 tests, 16 workers --
+PASS: LLVM :: CodeGen/M88k/cfi-debug-frame.ll (1 of 187)
+PASS: LLVM :: CodeGen/M88k/cfi-debug-frame.ll (2 of 187)
+PASS: LLVM :: CodeGen/M88k/floatarith.ll (3 of 187)
+PASS: LLVM :: CodeGen/M88k/openbsd-reserved-regs.ll (4 of 187)
+PASS: LLVM :: CodeGen/M88k/load.ll (5 of 187)
+PASS: LLVM :: CodeGen/M88k/floatarith.ll (6 of 187)
+PASS: lld :: ELF/m88k-plt.s (7 of 187)
+PASS: LLVM :: CodeGen/M88k/load.ll (8 of 187)
+PASS: LLVM :: CodeGen/M88k/openbsd-reserved-regs.ll (9 of 187)
+PASS: LLVM :: CodeGen/M88k/dynamic-alloca.ll (10 of 187)
+PASS: LLVM :: CodeGen/M88k/store.ll (11 of 187)
+PASS: LLVM :: CodeGen/M88k/store.ll (12 of 187)
+PASS: LLVM :: CodeGen/M88k/dynamic-alloca.ll (13 of 187)
+PASS: LLVM :: CodeGen/M88k/add.ll (14 of 187)
+PASS: LLVM :: CodeGen/M88k/unaligned_ptr_i64.ll (15 of 187)
+PASS: LLVM :: CodeGen/M88k/add.ll (16 of 187)
+PASS: Clang :: Driver/m88k-openbsd.c (17 of 187)
+PASS: LLVM :: CodeGen/M88k/callee.ll (18 of 187)
+PASS: LLVM :: CodeGen/M88k/callee.ll (19 of 187)
+PASS: Clang :: Preprocessor/m88k-target-defines.c (20 of 187)
+PASS: Clang :: Sema/m88k-types-layout.c (21 of 187)
+PASS: Clang :: Driver/m88k-baremetal.c (22 of 187)
+PASS: Clang :: CodeGen/M88k/abi-args.c (23 of 187)
+PASS: LLVM :: CodeGen/M88k/unaligned_ptr_i64.ll (24 of 187)
+PASS: Clang :: Driver/m88k-invalid-cpu.c (25 of 187)
+PASS: LLVM :: CodeGen/M88k/shift.ll (26 of 187)
+PASS: Clang :: Preprocessor/m88k-types-defines.c (27 of 187)
+PASS: Clang :: Driver/m88k-mtune.c (28 of 187)
+PASS: LLVM :: CodeGen/M88k/shift.ll (29 of 187)
+PASS: Clang :: Driver/m88k-mcpu.c (30 of 187)
+PASS: LLVM :: CodeGen/M88k/cond.ll (31 of 187)
+PASS: LLVM :: CodeGen/M88k/load_unaligned.ll (32 of 187)
+PASS: LLVM :: CodeGen/M88k/load_unaligned.ll (33 of 187)
+PASS: LLVM :: CodeGen/M88k/move.ll (34 of 187)
+PASS: LLVM :: CodeGen/M88k/fcmp.ll (35 of 187)
+PASS: LLVM :: CodeGen/M88k/move.ll (36 of 187)
+PASS: Clang :: CodeGen/m88k-netbsd-types.c (37 of 187)
+PASS: LLVM :: CodeGen/M88k/cond.ll (38 of 187)
+PASS: Clang :: CodeGen/M88k/builtins-m88k.c (39 of 187)
+PASS: Clang :: CodeGen/M88k/abi-args.c (40 of 187)
+PASS: LLVM :: CodeGen/M88k/combine-loops.ll (41 of 187)
+PASS: Clang :: CodeGen/M88k/varargs-more.c (42 of 187)
+PASS: Clang :: CodeGen/M88k/varargs-more.c (43 of 187)
+PASS: LLVM :: CodeGen/M88k/fcmp.ll (44 of 187)
+PASS: LLVM :: CodeGen/M88k/fptoui-i32.ll (45 of 187)
+PASS: Clang :: Sema/m88k-inline-asm.c (46 of 187)
+PASS: LLVM :: CodeGen/M88k/and.ll (47 of 187)
+PASS: LLVM :: CodeGen/M88k/combine-loops.ll (48 of 187)
+PASS: LLVM :: CodeGen/M88k/intrinsics-fold.ll (49 of 187)
+PASS: LLVM :: CodeGen/M88k/fptoui-i32.ll (50 of 187)
+PASS: LLVM :: CodeGen/M88k/and.ll (51 of 187)
+PASS: LLVM :: CodeGen/M88k/or.ll (52 of 187)
+PASS: Clang :: CodeGen/M88k/builtins-m88k.c (53 of 187)
+PASS: LLVM :: CodeGen/M88k/intrinsics-fold.ll (54 of 187)
+PASS: LLVM :: CodeGen/M88k/or.ll (55 of 187)
+PASS: LLVM :: CodeGen/M88k/frameaddr.ll (56 of 187)
+PASS: Clang :: Preprocessor/m88k-netbsd-defines.c (57 of 187)
+PASS: LLVM :: CodeGen/M88k/vararg.ll (58 of 187)
+PASS: LLVM :: CodeGen/M88k/frameaddr.ll (59 of 187)
+PASS: LLVM :: CodeGen/M88k/constant.ll (60 of 187)
+PASS: LLVM :: CodeGen/M88k/vararg.ll (61 of 187)
+PASS: LLVM :: CodeGen/M88k/pointerarith.ll (62 of 187)
+PASS: LLVM :: CodeGen/M88k/constant.ll (63 of 187)
+PASS: LLVM :: CodeGen/M88k/frameindex.ll (64 of 187)
+PASS: LLVM :: CodeGen/M88k/branch.ll (65 of 187)
+PASS: LLVM :: CodeGen/M88k/frameindex.ll (66 of 187)
+PASS: LLVM :: CodeGen/M88k/returnaddr.ll (67 of 187)
+PASS: LLVM :: CodeGen/M88k/int-ops-lower.ll (68 of 187)
+PASS: LLVM :: CodeGen/M88k/i1-arg-phi.ll (69 of 187)
+PASS: LLVM :: CodeGen/M88k/branch.ll (70 of 187)
+PASS: LLVM :: CodeGen/M88k/sret-demotion.ll (71 of 187)
+PASS: LLVM :: CodeGen/M88k/returnaddr.ll (72 of 187)
+PASS: LLVM :: CodeGen/M88k/pointerarith.ll (73 of 187)
+PASS: LLVM :: CodeGen/M88k/int-ops-lower.ll (74 of 187)
+PASS: LLVM :: CodeGen/M88k/sret-demotion.ll (75 of 187)
+PASS: LLVM :: CodeGen/M88k/select.ll (76 of 187)
+PASS: LLVM :: CodeGen/M88k/i1-arg-phi.ll (77 of 187)
+PASS: LLVM :: CodeGen/M88k/bitcount-odd.ll (78 of 187)
+PASS: LLVM :: CodeGen/M88k/bitcount-odd.ll (79 of 187)
+PASS: LLVM :: CodeGen/M88k/select.ll (80 of 187)
+PASS: LLVM :: CodeGen/M88k/ctlz.ll (81 of 187)
+PASS: LLVM :: CodeGen/M88k/load-and-mask-be.ll (82 of 187)
+PASS: LLVM :: CodeGen/M88k/ctlz.ll (83 of 187)
+PASS: Clang :: Frontend/m88k-invalid-cpu.c (84 of 187)
+PASS: LLVM :: CodeGen/M88k/intrinsics.ll (85 of 187)
+PASS: Clang :: CodeGen/M88k/varargs.c (86 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/legalize-odd-scalars.ll (87 of 187)
+PASS: Clang :: CodeGen/M88k/varargs.c (88 of 187)
+PASS: LLVM :: CodeGen/M88k/load-and-mask-be.ll (89 of 187)
+PASS: LLVM :: CodeGen/M88k/intrinsics.ll (90 of 187)
+PASS: Clang :: Sema/m88k-unsupported.c (91 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/legalize-odd-scalars.ll (92 of 187)
+PASS: LLVM :: CodeGen/M88k/fp-libm-libcalls.ll (93 of 187)
+PASS: LLVM :: CodeGen/M88k/divrem.ll (94 of 187)
+PASS: Clang :: CodeGen/m88k-regnames.c (95 of 187)
+PASS: LLVM :: CodeGen/M88k/trunc-phi-i64.ll (96 of 187)
+PASS: LLVM :: CodeGen/M88k/fp-libm-libcalls.ll (97 of 187)
+PASS: LLVM :: CodeGen/M88k/xor.ll (98 of 187)
+PASS: LLVM :: CodeGen/M88k/trunc-phi-i64.ll (99 of 187)
+PASS: LLVM :: CodeGen/M88k/divrem.ll (100 of 187)
+PASS: LLVM :: CodeGen/M88k/xor.ll (101 of 187)
+PASS: LLVM :: CodeGen/M88k/bitfield-extract-wide.ll (102 of 187)
+PASS: LLVM :: CodeGen/M88k/bitfield-extract-wide.ll (103 of 187)
+PASS: LLVM :: CodeGen/M88k/ptradd-scaled-copy.ll (104 of 187)
+PASS: LLVM :: CodeGen/M88k/bitcount64.ll (105 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax-directives.s (106 of 187)
+PASS: LLVM :: CodeGen/M88k/inline-asm-mem.ll (107 of 187)
+PASS: LLVM :: CodeGen/M88k/ptrmask-var.ll (108 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax-directives.s (109 of 187)
+PASS: LLVM :: CodeGen/M88k/inline-asm-mem.ll (110 of 187)
+PASS: LLVM :: CodeGen/M88k/ptrmask-var.ll (111 of 187)
+PASS: LLVM :: CodeGen/M88k/ptradd-scaled-copy.ll (112 of 187)
+PASS: LLVM :: CodeGen/M88k/fp-ops-lower.ll (113 of 187)
+PASS: LLVM :: CodeGen/M88k/debug-value-s16.ll (114 of 187)
+PASS: LLVM :: CodeGen/M88k/bitcount64.ll (115 of 187)
+PASS: LLVM :: CodeGen/M88k/fp-ops-lower.ll (116 of 187)
+PASS: LLVM :: CodeGen/M88k/intarith.ll (117 of 187)
+PASS: LLVM :: CodeGen/M88k/sext-inreg.ll (118 of 187)
+PASS: LLVM :: CodeGen/M88k/bswap.ll (119 of 187)
+PASS: LLVM :: CodeGen/M88k/ext-i1-i64.ll (120 of 187)
+PASS: LLVM :: CodeGen/M88k/ext-i1-i64.ll (121 of 187)
+PASS: LLVM :: CodeGen/M88k/sext-inreg.ll (122 of 187)
+PASS: LLVM :: CodeGen/M88k/debug-value-s16.ll (123 of 187)
+PASS: LLVM :: CodeGen/M88k/intarith.ll (124 of 187)
+PASS: LLVM :: CodeGen/M88k/bswap.ll (125 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax-off.s (126 of 187)
+PASS: LLVM :: CodeGen/M88k/args-odd-int.ll (127 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/legalize-phi-small.ll (128 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/legalize-scmp-ucmp.ll (129 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/call-return.ll (130 of 187)
+PASS: LLVM :: MC/M88k/data-pc-rel.s (131 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/m88k-legalize-binops.mir (132 of 187)
+PASS: LLVM :: CodeGen/M88k/delay-slot-filler.mir (133 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/call-return.ll (134 of 187)
+PASS: LLVM :: MC/M88k/data-pc-rel.s (135 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/legalize-scmp-ucmp.ll (136 of 187)
+PASS: LLVM :: CodeGen/M88k/sdiv-known-numerator-sign.ll (137 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/legalize-phi-small.ll (138 of 187)
+PASS: LLVM :: CodeGen/M88k/sdiv-known-numerator-sign.ll (139 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/m88k-legalize-binops.mir (140 of 187)
+PASS: LLVM :: CodeGen/M88k/va-copy.ll (141 of 187)
+PASS: LLVM :: CodeGen/M88k/delay-slot-filler.mir (142 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax-off.s (143 of 187)
+PASS: LLVM :: CodeGen/M88k/inline-asm.ll (144 of 187)
+PASS: LLVM :: CodeGen/M88k/inline-asm-gnu-syntax.ll (145 of 187)
+PASS: LLVM :: CodeGen/M88k/va-copy.ll (146 of 187)
+PASS: LLVM :: CodeGen/M88k/inline-asm-gnu-syntax.ll (147 of 187)
+PASS: LLVM :: CodeGen/M88k/prolog.mir (148 of 187)
+PASS: LLVM :: CodeGen/M88k/vararg-va-start.ll (149 of 187)
+PASS: LLVM :: CodeGen/M88k/args-odd-int.ll (150 of 187)
+PASS: LLVM :: CodeGen/M88k/vararg-va-start.ll (151 of 187)
+PASS: LLVM :: CodeGen/M88k/srem-small.ll (152 of 187)
+PASS: LLVM :: CodeGen/M88k/inline-asm.ll (153 of 187)
+PASS: LLVM :: CodeGen/M88k/cc-i64-after-r8.ll (154 of 187)
+PASS: LLVM :: CodeGen/M88k/cc-i64-after-r8.ll (155 of 187)
+PASS: LLVM :: CodeGen/M88k/prolog.mir (156 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/select-baremetal-fixes.mir (157 of 187)
+PASS: LLVM :: CodeGen/M88k/fp-round-libcall.ll (158 of 187)
+PASS: LLVM :: MC/M88k/valid.s (159 of 187)
+PASS: LLVM :: CodeGen/M88k/fp-round-libcall.ll (160 of 187)
+PASS: LLVM :: MC/M88k/valid.s (161 of 187)
+PASS: LLVM :: MC/M88k/valid88110.s (162 of 187)
+PASS: LLVM :: MC/M88k/requires88110.s (163 of 187)
+PASS: LLVM :: CodeGen/M88k/srem-small.ll (164 of 187)
+PASS: LLVM :: MC/M88k/requires88110.s (165 of 187)
+PASS: LLVM :: CodeGen/M88k/uitofp-i64.ll (166 of 187)
+PASS: LLVM :: MC/M88k/valid88110.s (167 of 187)
+PASS: LLVM :: MC/M88k/data-abs.s (168 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/select-baremetal-fixes.mir (169 of 187)
+PASS: LLVM :: MC/M88k/data-abs.s (170 of 187)
+PASS: LLVM :: CodeGen/M88k/prolog.ll (171 of 187)
+PASS: LLVM :: CodeGen/M88k/uitofp-i64.ll (172 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/overflow.mir (173 of 187)
+PASS: LLVM :: CodeGen/M88k/GlobalISel/overflow.mir (174 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax.s (175 of 187)
+PASS: LLVM :: CodeGen/M88k/prolog.ll (176 of 187)
+PASS: LLVM :: MC/M88k/controlreg.s (177 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax-netbsd.s (178 of 187)
+PASS: LLVM :: MC/M88k/controlreg.s (179 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax-netbsd.s (180 of 187)
+PASS: LLVM :: MC/M88k/gnu-syntax.s (181 of 187)
+PASS: LLVM :: CodeGen/M88k/load-store-odd.ll (182 of 187)
+PASS: LLVM :: CodeGen/M88k/load-store-odd.ll (183 of 187)
+PASS: LLVM :: CodeGen/M88k/icmp-imm.ll (184 of 187)
+PASS: LLVM :: CodeGen/M88k/ffs.ll (185 of 187)
+PASS: LLVM :: CodeGen/M88k/icmp-imm.ll (186 of 187)
+PASS: LLVM :: CodeGen/M88k/ffs.ll (187 of 187)
+
+Testing Time: 0.78s
+
+Total Discovered Tests: 187
+  Passed: 187 (100.00%)

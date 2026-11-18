@@ -88,12 +88,19 @@ On dry_run, `setup` pre-writes `replay-state.json` (DONE), `build-review.json` (
 A dry run does not prove the replay, the build or the compiler-rt/bare-metal steps. The conflict forecast
 approximates the real replay: a clean forecast does not guarantee a clean `rebase --onto` and the reverse.
 
+## Baseline of the LLVM 21 stack
+- Location: `.agents/tasks/m88k-llvm-port/baseline-llvm21/` (`results.txt`, `meta.txt`, `logs/`). Convention: `baseline-<source_ref>`.
+- Date: 2026-11-18 run of `scripts/m88k-baseline.sh` (see `meta.txt` for the exact time). Source commit: `bb610c33b5f9ec6feac72e3a6b5ae4ad8b604b8c` on `clang-netbsd-kernel`, LLVM 21-based. Builds were used as they were, not rebuilt.
+- Counts: lit 101 PASS; lldb 2 PASS; rt 4 PASS (build and install for none-elf and openbsd); baremetal 11 PASS, 1 FAIL.
+- Pre-existing failure: `baremetal/fpx-real` FAIL. Two known NaN/inf lines differ from `fpx-real.expected` (`inf-inf class`, `nan cmp`). It is the baseline; do not fix it in the port.
+- Script fixes made for this run: `rec` aborted under `set -u` when called with one argument (broke the rt and baremetal steps), and `plugin list` does not exist in this lldb (the ABI plugin check now greps liblldb).
+
 ## Untested parts
 
 Nothing past the dry-run checks has been run. As of this file's creation:
 
 - Tested by hand: `m88k-baseline.sh --only lit` on the LLVM 21-based build (101 results, all PASS), `m88k-baseline-diff.sh` on sample files, `bash -n` on both scripts, JSON validity of the recipe.
-- Untested: the `lldb`, `rt` and `baremetal` steps of `m88k-baseline.sh`; compiler-rt reconfiguration when the resource dir changes; running ncd19c tests through the `.llvm-shim` directory; the whole recipe in the workflow engine (parameter substitution, `fileCheck` stop conditions, `captureOutput`); worktree and per-segment replay; the build-fix loop; verify, triage and report steps; the baremetal expectation that `fpx-real` differs from `.expected` in two known NaN lines (it will show as FAIL in the baseline, which is correct, because only differences are reported).
+- Untested: compiler-rt reconfiguration when the resource dir changes (the `lldb`, `rt` build/install and `baremetal` steps ran on 2026-11-18, see the baseline section); the whole recipe in the workflow engine (parameter substitution, `fileCheck` stop conditions, `captureOutput`); worktree and per-segment replay; the build-fix loop; verify, triage and report steps; the baremetal expectation that `fpx-real` differs from `.expected` in two known NaN lines (it will show as FAIL in the baseline, which is correct, because only differences are reported).
 - Not available here: `shellcheck`.
 - Known gap: `lldb` has no lit tests for M88k. The lldb step only checks that the binary starts and lists the M88k ABI plugin.
 

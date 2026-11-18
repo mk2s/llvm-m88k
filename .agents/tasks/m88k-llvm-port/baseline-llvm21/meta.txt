@@ -1,0 +1,8 @@
+date=2026-11-18T13:40:44Z
+src=/home/mk2s/Documents/llvm-m88k
+branch=clang-netbsd-kernel
+commit=bb610c33b5f9ec6feac72e3a6b5ae4ad8b604b8c
+build_dir=/home/mk2s/Documents/llvm-m88k/build
+clang=clang version 21.0.0git
+llvm_version_major=21
+steps=lit lldb rt baremetal

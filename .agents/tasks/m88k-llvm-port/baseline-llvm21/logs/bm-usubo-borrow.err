@@ -1,0 +1,5 @@
+[mame] NCD section .text addr=04020000 size=3ee0
+[mame] NCD section .data addr=08010000 size=48
+[mame] NCD section .bss addr=08010048 size=10e8
+[mame] NCD jumped (XIP was 0400b2dc)
+[mame] NCD done (XIP=0400b2dc r31=0800fd50)
