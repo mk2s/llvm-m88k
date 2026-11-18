@@ -129,7 +129,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
   // property check already is.
   if (!DisableGISelLegalityCheck)
     if (const MachineInstr *MI = machineFunctionIsIllegal(MF)) {
-      reportGISelFailure(MF, TPC, MORE, "gisel-select",
+      reportGISelFailure(MF, MORE, "gisel-select",
                          "instruction is not legal", *MI);
       return false;
     }
@@ -230,7 +230,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
       if (!ISel->reduce(MI)) {
         // FIXME: It would be nice to dump all inserted instructions.  It's
         // not obvious how, esp. considering select() can insert after MI.
-        reportGISelFailure(MF, TPC, MORE, "gisel-select", "cannot select", MI);
+        reportGISelFailure(MF, MORE, "gisel-select", "cannot select", MI);
         return false;
       }
 
@@ -306,7 +306,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
 
     const TargetRegisterClass *RC = MRI.getRegClassOrNull(VReg);
     if (!RC) {
-      reportGISelFailure(MF, TPC, MORE, "gisel-select",
+      reportGISelFailure(MF, MORE, "gisel-select",
                          "VReg has no regclass after selection", *MI);
       return false;
     }
@@ -315,7 +315,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
     if (Ty.isValid() &&
         TypeSize::isKnownGT(Ty.getSizeInBits(), TRI.getRegSizeInBits(*RC))) {
       reportGISelFailure(
-          MF, TPC, MORE, "gisel-select",
+          MF, MORE, "gisel-select",
           "VReg's low-level type and register class have different sizes", *MI);
       return false;
     }
@@ -326,7 +326,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
                                       MF.getFunction().getSubprogram(),
                                       /*MBB=*/nullptr);
     R << "inserting blocks is not supported yet";
-    reportGISelFailure(MF, TPC, MORE, R);
+    reportGISelFailure(MF, MORE, R);
     return false;
   }
 #endif
