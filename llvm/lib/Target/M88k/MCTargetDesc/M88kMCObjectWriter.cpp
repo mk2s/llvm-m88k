@@ -29,8 +29,8 @@ public:
 
 protected:
   // Override MCELFObjectTargetWriter.
-  unsigned getRelocType(MCContext &Ctx, const MCValue &Target,
-                        const MCFixup &Fixup, bool IsPCRel) const override;
+  unsigned getRelocType(const MCFixup &Fixup, const MCValue &Target,
+                        bool IsPCRel) const override;
 };
 
 } // end anonymous namespace
@@ -39,8 +39,8 @@ M88kObjectWriter::M88kObjectWriter(uint8_t OSABI)
     : MCELFObjectTargetWriter(/*Is64Bit_=*/false, OSABI, ELF::EM_88K,
                               /*HasRelocationAddend_=*/true) {}
 
-unsigned M88kObjectWriter::getRelocType(MCContext &Ctx, const MCValue &Target,
-                                        const MCFixup &Fixup,
+unsigned M88kObjectWriter::getRelocType(const MCFixup &Fixup,
+                                        const MCValue &Target,
                                         bool IsPCRel) const {
   unsigned Type;
   unsigned Kind = static_cast<unsigned>(Fixup.getKind());

@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/M88kInstPrinter.h"
-#include "MCTargetDesc/M88kMCExpr.h"
+#include "MCTargetDesc/M88kMCAsmInfo.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "MCTargetDesc/M88kTargetStreamer.h"
 #include "TargetInfo/M88kTargetInfo.h"
@@ -278,7 +278,7 @@ class M88kAsmParser : public MCTargetAsmParser {
   // Parse a %hi16(...) / %lo16(...) relocation operand.  On entry the lexer
   // is positioned on the identifier following the '%'.  Consumes the
   // identifier, the parenthesised sub-expression, and pushes an immediate
-  // operand wrapping an M88kMCExpr.  Returns true on error.
+  // operand wrapping an MCSpecifierExpr.  Returns true on error.
   bool parseRelocExpr(OperandVector &Operands, SMLoc PercentLoc);
 
   ParseStatus parseBFWidth(OperandVector &Operands);
@@ -666,11 +666,11 @@ bool M88kAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
 bool M88kAsmParser::parseRelocExpr(OperandVector &Operands, SMLoc PercentLoc) {
   // On entry the lexer is on the "hi16"/"lo16" identifier.
   StringRef Id = Parser.getTok().getIdentifier();
-  M88kMCExpr::VariantKind Kind = StringSwitch<M88kMCExpr::VariantKind>(Id)
-                                     .Case("hi16", M88kMCExpr::VK_ABS_HI)
-                                     .Case("lo16", M88kMCExpr::VK_ABS_LO)
-                                     .Default(M88kMCExpr::VK_None);
-  if (Kind == M88kMCExpr::VK_None)
+  M88k::Specifier Kind = StringSwitch<M88k::Specifier>(Id)
+                             .Case("hi16", M88k::S_ABS_HI)
+                             .Case("lo16", M88k::S_ABS_LO)
+                             .Default(M88k::S_None);
+  if (Kind == M88k::S_None)
     return Error(PercentLoc, "unknown relocation specifier");
   Parser.Lex(); // Eat the identifier.
 
@@ -688,7 +688,7 @@ bool M88kAsmParser::parseRelocExpr(OperandVector &Operands, SMLoc PercentLoc) {
   SMLoc EndLoc = Parser.getTok().getLoc();
   Parser.Lex(); // Eat ')'.
 
-  const MCExpr *Expr = M88kMCExpr::create(Kind, SubExpr, getContext());
+  const MCExpr *Expr = MCSpecifierExpr::create(SubExpr, Kind, getContext());
   Operands.push_back(M88kOperand::createImm(Expr, PercentLoc, EndLoc));
   return false;
 }

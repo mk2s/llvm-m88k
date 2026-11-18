@@ -9,7 +9,7 @@
 #include "M88kMCInstLower.h"
 #include "M88kRegisterInfo.h"
 #include "MCTargetDesc/M88kBaseInfo.h"
-#include "MCTargetDesc/M88kMCExpr.h"
+#include "MCTargetDesc/M88kMCAsmInfo.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -26,8 +26,7 @@ M88kMCInstLower::M88kMCInstLower(MCContext &Ctx, AsmPrinter &Printer)
     : Ctx(Ctx), Printer(Printer) {}
 
 MCOperand M88kMCInstLower::lowerSymbolOperand(const MachineOperand &MO) const {
-  MCSymbolRefExpr::VariantKind Kind = MCSymbolRefExpr::VK_None;
-  M88kMCExpr::VariantKind TargetKind = M88kMCExpr::VK_None;
+  M88k::Specifier TargetKind = M88k::S_None;
   const MCSymbol *Symbol;
   bool HasOffset = true;
 
@@ -37,10 +36,10 @@ MCOperand M88kMCInstLower::lowerSymbolOperand(const MachineOperand &MO) const {
   case M88kII::MO_NO_FLAG:
     break;
   case M88kII::MO_ABS_HI:
-    TargetKind = M88kMCExpr::VK_ABS_HI;
+    TargetKind = M88k::S_ABS_HI;
     break;
   case M88kII::MO_ABS_LO:
-    TargetKind = M88kMCExpr::VK_ABS_LO;
+    TargetKind = M88k::S_ABS_LO;
     break;
   }
 
@@ -74,7 +73,7 @@ MCOperand M88kMCInstLower::lowerSymbolOperand(const MachineOperand &MO) const {
   default:
     llvm_unreachable("unknown operand type");
   }
-  const MCExpr *Expr = MCSymbolRefExpr::create(Symbol, Kind, Ctx);
+  const MCExpr *Expr = MCSymbolRefExpr::create(Symbol, Ctx);
   if (HasOffset) {
     if (int64_t Offset = MO.getOffset()) {
       const MCExpr *OffsetExpr = MCConstantExpr::create(Offset, Ctx);
@@ -82,7 +81,7 @@ MCOperand M88kMCInstLower::lowerSymbolOperand(const MachineOperand &MO) const {
     }
   }
   if (TargetKind)
-    Expr = M88kMCExpr::create(TargetKind, Expr, Ctx);
+    Expr = MCSpecifierExpr::create(Expr, TargetKind, Ctx);
   return MCOperand::createExpr(Expr);
 }
 

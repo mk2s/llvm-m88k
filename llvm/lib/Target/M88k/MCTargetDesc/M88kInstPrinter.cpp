@@ -34,7 +34,7 @@ void M88kInstPrinter::printOperand(const MCInst *MI, int OpNum,
   } else if (MO.isImm())
     O << MO.getImm();
   else if (MO.isExpr())
-    MO.getExpr()->print(O, &MAI);
+    MAI.printExpr(O, *MO.getExpr());
   else
     llvm_unreachable("Invalid operand");
 }
@@ -49,7 +49,7 @@ void M88kInstPrinter::printOperand(const MCOperand &MO, const MCAsmInfo *MAI,
   } else if (MO.isImm())
     O << MO.getImm();
   else if (MO.isExpr())
-    MO.getExpr()->print(O, MAI);
+    MAI->printExpr(O, *MO.getExpr());
   else
     llvm_unreachable("Invalid operand");
 }
@@ -70,7 +70,7 @@ void M88kInstPrinter::printU16ImmOperand(const MCInst *MI, int OpNum,
     O << MO.getImm();
   } else {
     assert(MO.isExpr() && "Expected expression");
-    MO.getExpr()->print(O, &MAI);
+    MAI.printExpr(O, *MO.getExpr());
   }
 }
 
@@ -82,7 +82,7 @@ void M88kInstPrinter::printVec9Operand(const MCInst *MI, int OpNum,
     O << MO.getImm();
   } else {
     assert(MO.isExpr() && "Expected expression");
-    MO.getExpr()->print(O, &MAI);
+    MAI.printExpr(O, *MO.getExpr());
   }
 }
 
@@ -141,7 +141,7 @@ void M88kInstPrinter::printPCRelOperand(const MCInst *MI, uint64_t Address,
   if (MO.isImm())
     O << MO.getImm();
   else
-    MO.getExpr()->print(O, &MAI);
+    MAI.printExpr(O, *MO.getExpr());
 }
 
 void M88kInstPrinter::printRegName(raw_ostream &OS, MCRegister Reg) {

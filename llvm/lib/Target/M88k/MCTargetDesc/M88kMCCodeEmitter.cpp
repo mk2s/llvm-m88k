@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "MCTargetDesc/M88kMCExpr.h"
+#include "MCTargetDesc/M88kMCAsmInfo.h"
 #include "MCTargetDesc/M88kMCFixups.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "llvm/ADT/SmallVector.h"
@@ -88,14 +88,15 @@ void M88kMCCodeEmitter::encodeInstruction(const MCInst &MI,
 }
 
 static M88k::FixupKind fixupKind(const MCExpr *Expr) {
-  if (const M88kMCExpr *McExpr = dyn_cast<M88kMCExpr>(Expr)) {
-    M88kMCExpr::VariantKind ExprKind = McExpr->getKind();
-    switch (ExprKind) {
-    case M88kMCExpr::VK_None:
+  if (const MCSpecifierExpr *McExpr = dyn_cast<MCSpecifierExpr>(Expr)) {
+    switch (McExpr->getSpecifier()) {
+    default:
+      llvm_unreachable("Invalid specifier");
+    case M88k::S_None:
       return M88k::FK_88K_NONE;
-    case M88kMCExpr::VK_ABS_HI:
+    case M88k::S_ABS_HI:
       return M88k::FK_88K_HI;
-    case M88kMCExpr::VK_ABS_LO:
+    case M88k::S_ABS_LO:
       return M88k::FK_88K_LO;
     }
   }
@@ -135,7 +136,7 @@ unsigned M88kMCCodeEmitter::getPC16Encoding(const MCInst &MI, unsigned OpNo,
       MO.isImm() ? MCConstantExpr::create(MO.getImm(), Ctx) : MO.getExpr();
 
   Fixups.push_back(MCFixup::create(
-      0, Expr, static_cast<MCFixupKind>(M88k::FK_88K_DISP16), MI.getLoc()));
+      0, Expr, static_cast<MCFixupKind>(M88k::FK_88K_DISP16)));
   return 0;
 }
 
@@ -149,7 +150,7 @@ unsigned M88kMCCodeEmitter::getPC26Encoding(const MCInst &MI, unsigned OpNo,
       MO.isImm() ? MCConstantExpr::create(MO.getImm(), Ctx) : MO.getExpr();
 
   Fixups.push_back(MCFixup::create(
-      0, Expr, static_cast<MCFixupKind>(M88k::FK_88K_DISP26), MI.getLoc()));
+      0, Expr, static_cast<MCFixupKind>(M88k::FK_88K_DISP26)));
   return 0;
 }
 

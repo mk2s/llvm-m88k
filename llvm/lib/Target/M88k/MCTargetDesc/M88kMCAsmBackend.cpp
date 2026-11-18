@@ -17,7 +17,6 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCFixup.h"
-#include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -86,21 +85,14 @@ public:
       : MCAsmBackend(endianness::big), OSABI(OSABI) {}
 
   // Override MCAsmBackend
-  unsigned getNumFixupKinds() const override;
-  const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override;
+  MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override;
   std::optional<MCFixupKind> getFixupKind(StringRef Name) const override;
 
-  void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                  const MCValue &Target, MutableArrayRef<char> Data,
-                  uint64_t Value, bool IsResolved,
-                  const MCSubtargetInfo *STI) const override;
-  bool mayNeedRelaxation(const MCInst &Inst,
-                         const MCSubtargetInfo &STI) const override;
+  void applyFixup(const MCFragment &F, const MCFixup &Fixup,
+                  const MCValue &Target, uint8_t *Data, uint64_t Value,
+                  bool IsResolved) override;
   bool fixupNeedsRelaxation(const MCFixup &Fixup,
                             uint64_t Value) const override;
-  bool shouldForceRelocation(const MCAssembler &Asm, const MCFixup &Fixup,
-                             const MCValue &Target, const uint64_t Value,
-                             const MCSubtargetInfo *STI) override;
   bool writeNopData(raw_ostream &OS, uint64_t Count,
                     const MCSubtargetInfo *STI) const override;
 
@@ -110,10 +102,6 @@ public:
   }
 };
 } // end anonymous namespace
-
-unsigned M88kMCAsmBackend::getNumFixupKinds() const {
-  return M88k::NumTargetFixupKinds;
-}
 
 std::optional<MCFixupKind>
 M88kMCAsmBackend::getFixupKind(StringRef Name) const {
@@ -127,8 +115,7 @@ M88kMCAsmBackend::getFixupKind(StringRef Name) const {
   return std::nullopt;
 }
 
-const MCFixupKindInfo &
-M88kMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
+MCFixupKindInfo M88kMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
   static const MCFixupKindInfo Infos[M88k::NumTargetFixupKinds] = {
       // This table *must* be in same the order of fixup_* kinds in
       // M88kMCFixups.h.
@@ -146,53 +133,38 @@ M88kMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
   if (Kind < FirstTargetFixupKind)
     return MCAsmBackend::getFixupKindInfo(Kind);
 
-  assert(unsigned(Kind - FirstTargetFixupKind) < getNumFixupKinds() &&
+  assert(unsigned(Kind - FirstTargetFixupKind) < M88k::NumTargetFixupKinds &&
          "Invalid kind!");
   return Infos[Kind - FirstTargetFixupKind];
 }
 
-void M88kMCAsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                                  const MCValue &Target,
-                                  MutableArrayRef<char> Data, uint64_t Value,
-                                  bool IsResolved,
-                                  const MCSubtargetInfo *STI) const {
+void M88kMCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
+                                  const MCValue &Target, uint8_t *Data,
+                                  uint64_t Value, bool IsResolved) {
   MCFixupKind Kind = Fixup.getKind();
-  if (Kind >= FirstLiteralRelocationKind)
+  // Branch displacements always get a relocation.
+  if (Kind == M88k::FK_88K_DISP16 || Kind == M88k::FK_88K_DISP26)
+    IsResolved = false;
+  maybeAddReloc(F, Fixup, Target, Value, IsResolved);
+  if (mc::isRelocation(Kind))
     return;
-  unsigned Offset = Fixup.getOffset();
   unsigned BitSize = getFixupKindInfo(Kind).TargetSize;
   unsigned Size = (BitSize + 7) / 8;
 
-  assert(Offset + Size <= Data.size() && "Invalid fixup offset!");
-
   // Big-endian insertion of Size bytes.
-  Value = extractBitsForFixup(Kind, Value, Fixup, Asm.getContext());
+  Value = extractBitsForFixup(Kind, Value, Fixup, getContext());
   if (BitSize < 64)
     Value &= ((uint64_t)1 << BitSize) - 1;
   unsigned ShiftValue = (Size * 8) - 8;
   for (unsigned I = 0; I != Size; ++I) {
-    Data[Offset + I] |= uint8_t(Value >> ShiftValue);
+    Data[I] |= uint8_t(Value >> ShiftValue);
     ShiftValue -= 8;
   }
-}
-
-bool M88kMCAsmBackend::mayNeedRelaxation(const MCInst &Inst,
-                                         const MCSubtargetInfo &STI) const {
-  return false;
 }
 
 bool M88kMCAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
                                             uint64_t Value) const {
   return false;
-}
-
-bool M88kMCAsmBackend::shouldForceRelocation(const MCAssembler &Asm,
-                                             const MCFixup &Fixup,
-                                             const MCValue &Target,
-                                             const uint64_t Value,
-                                             const MCSubtargetInfo *STI) {
-  unsigned Kind = Fixup.getKind();
-  return Kind == M88k::FK_88K_DISP16 || Kind == M88k::FK_88K_DISP26;
 }
 
 bool M88kMCAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,
