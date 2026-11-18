@@ -26,7 +26,7 @@
 #include "llvm/CodeGen/GlobalISel/CombinerInfo.h"
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutor.h"
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutorImpl.h"
-#include "llvm/CodeGen/GlobalISel/GISelKnownBits.h"
+#include "llvm/CodeGen/GlobalISel/GISelValueTracking.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/Utils.h"
@@ -68,7 +68,7 @@ protected:
 public:
   M88kPreLegalizerCombinerImpl(
       MachineFunction &MF, CombinerInfo &CInfo, const TargetPassConfig *TPC,
-      GISelKnownBits &KB, GISelCSEInfo *CSEInfo,
+      GISelValueTracking &VT, GISelCSEInfo *CSEInfo,
       const M88kPreLegalizerCombinerImplRuleConfig &RuleConfig,
       const M88kSubtarget &STI);
 
@@ -124,7 +124,7 @@ bool M88kPreLegalizerCombinerImpl::matchBitfieldExtractFromAndAShr(
   // ShrAmt plus the width of the mask must not be greater than register,
   // because then at most the MSB of ShiftSrc is part of the resulting value.
   if (static_cast<uint64_t>(ShrAmt) + Width >= Size &&
-      !Helper.getKnownBits()->signBitIsZero(ShiftSrc))
+      !Helper.getValueTracking()->signBitIsZero(ShiftSrc))
     return false;
 
   MatchInfo = [=](MachineIRBuilder &B) {
@@ -142,11 +142,11 @@ bool M88kPreLegalizerCombinerImpl::matchBitfieldExtractFromAndAShr(
 namespace {
 M88kPreLegalizerCombinerImpl::M88kPreLegalizerCombinerImpl(
     MachineFunction &MF, CombinerInfo &CInfo, const TargetPassConfig *TPC,
-    GISelKnownBits &KB, GISelCSEInfo *CSEInfo,
+    GISelValueTracking &VT, GISelCSEInfo *CSEInfo,
     const M88kPreLegalizerCombinerImplRuleConfig &RuleConfig,
     const M88kSubtarget &STI)
-    : Combiner(MF, CInfo, TPC, &KB, CSEInfo),
-      Helper(Observer, B, /*IsPreLegalize*/ true, &KB), RuleConfig(RuleConfig),
+    : Combiner(MF, CInfo, TPC, &VT, CSEInfo),
+      Helper(Observer, B, /*IsPreLegalize*/ true, &VT), RuleConfig(RuleConfig),
       STI(STI),
 #define GET_GICOMBINER_CONSTRUCTOR_INITS
 #include "M88kGenPreLegalizeGICombiner.inc"
@@ -177,8 +177,8 @@ void M88kPreLegalizerCombiner::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetPassConfig>();
   AU.setPreservesCFG();
   getSelectionDAGFallbackAnalysisUsage(AU);
-  AU.addRequired<GISelKnownBitsAnalysis>();
-  AU.addPreserved<GISelKnownBitsAnalysis>();
+  AU.addRequired<GISelValueTrackingAnalysisLegacy>();
+  AU.addPreserved<GISelValueTrackingAnalysisLegacy>();
   AU.addRequired<MachineDominatorTreeWrapperPass>();
   AU.addPreserved<MachineDominatorTreeWrapperPass>();
   AU.addRequired<GISelCSEAnalysisWrapperPass>();
@@ -197,7 +197,7 @@ bool M88kPreLegalizerCombiner::runOnMachineFunction(MachineFunction &MF) {
   auto &TPC = getAnalysis<TargetPassConfig>();
 
   const Function &F = MF.getFunction();
-  GISelKnownBits *KB = &getAnalysis<GISelKnownBitsAnalysis>().get(MF);
+  GISelValueTracking *VT = &getAnalysis<GISelValueTrackingAnalysisLegacy>().get(MF);
 
   const M88kSubtarget &ST = MF.getSubtarget<M88kSubtarget>();
 
@@ -210,7 +210,7 @@ bool M88kPreLegalizerCombiner::runOnMachineFunction(MachineFunction &MF) {
   GISelCSEAnalysisWrapper &Wrapper =
       getAnalysis<GISelCSEAnalysisWrapperPass>().getCSEWrapper();
   auto *CSEInfo = &Wrapper.get(TPC.getCSEConfig());
-  M88kPreLegalizerCombinerImpl Impl(MF, CInfo, &TPC, *KB, CSEInfo, RuleConfig,
+  M88kPreLegalizerCombinerImpl Impl(MF, CInfo, &TPC, *VT, CSEInfo, RuleConfig,
                                     ST);
   return Impl.combineMachineInstrs();
 }
@@ -220,7 +220,7 @@ INITIALIZE_PASS_BEGIN(M88kPreLegalizerCombiner, DEBUG_TYPE,
                       "Combine M88k machine instrs before legalization", false,
                       false)
 INITIALIZE_PASS_DEPENDENCY(TargetPassConfig)
-INITIALIZE_PASS_DEPENDENCY(GISelKnownBitsAnalysis)
+INITIALIZE_PASS_DEPENDENCY(GISelValueTrackingAnalysisLegacy)
 INITIALIZE_PASS_DEPENDENCY(GISelCSEAnalysisWrapperPass)
 INITIALIZE_PASS_END(M88kPreLegalizerCombiner, DEBUG_TYPE,
                     "Combine M88k machine instrs before legalization", false,

@@ -49,7 +49,7 @@ public:
                           const M88kRegisterBankInfo &RBI);
 
   bool select(MachineInstr &I) override;
-  void setupMF(MachineFunction &MF, GISelKnownBits *KB,
+  void setupMF(MachineFunction &MF, GISelValueTracking *VT,
                CodeGenCoverage *CoverageInfo, ProfileSummaryInfo *PSI,
                BlockFrequencyInfo *BFI) override;
   static const char *getName() { return DEBUG_TYPE; }
@@ -1392,11 +1392,11 @@ bool M88kInstructionSelector::earlySelect(MachineInstr &I) {
   }
 }
 
-void M88kInstructionSelector::setupMF(MachineFunction &MF, GISelKnownBits *KB,
+void M88kInstructionSelector::setupMF(MachineFunction &MF, GISelValueTracking *VT,
                                       CodeGenCoverage *CoverageInfo,
                                       ProfileSummaryInfo *PSI,
                                       BlockFrequencyInfo *BFI) {
-  InstructionSelector::setupMF(MF, KB, CoverageInfo, PSI, BFI);
+  InstructionSelector::setupMF(MF, VT, CoverageInfo, PSI, BFI);
   MFReturnAddr = Register();
 }
 

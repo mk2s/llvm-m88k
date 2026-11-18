@@ -15,7 +15,7 @@
 #include "llvm/Analysis/LazyBlockFrequencyInfo.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/CodeGen/GlobalISel/BURSInstructionSelector.h"
-#include "llvm/CodeGen/GlobalISel/GISelKnownBits.h"
+#include "llvm/CodeGen/GlobalISel/GISelValueTracking.h"
 #include "llvm/CodeGen/GlobalISel/InstructionSelector.h"
 #include "llvm/CodeGen/GlobalISel/LegalizerInfo.h"
 #include "llvm/CodeGen/GlobalISel/Utils.h"
@@ -57,7 +57,7 @@ INITIALIZE_PASS_BEGIN(BURSInstructionSelect, DEBUG_TYPE,
                       "Select target instructions out of generic instructions",
                       false, false)
 INITIALIZE_PASS_DEPENDENCY(TargetPassConfig)
-INITIALIZE_PASS_DEPENDENCY(GISelKnownBitsAnalysis)
+INITIALIZE_PASS_DEPENDENCY(GISelValueTrackingAnalysisLegacy)
 INITIALIZE_PASS_DEPENDENCY(ProfileSummaryInfoWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(LazyBlockFrequencyInfoPass)
 INITIALIZE_PASS_END(BURSInstructionSelect, DEBUG_TYPE,
@@ -75,8 +75,8 @@ BURSInstructionSelect::BURSInstructionSelect()
 
 void BURSInstructionSelect::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetPassConfig>();
-  AU.addRequired<GISelKnownBitsAnalysis>();
-  AU.addPreserved<GISelKnownBitsAnalysis>();
+  AU.addRequired<GISelValueTrackingAnalysisLegacy>();
+  AU.addPreserved<GISelValueTrackingAnalysisLegacy>();
 
   if (OptLevel != CodeGenOptLevel::None) {
     AU.addRequired<ProfileSummaryInfoWrapperPass>();
@@ -105,7 +105,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
   OptLevel = MF.getFunction().hasOptNone() ? CodeGenOptLevel::None
                                            : MF.getTarget().getOptLevel();
 
-  GISelKnownBits *KB = &getAnalysis<GISelKnownBitsAnalysis>().get(MF);
+  GISelValueTracking *VT = &getAnalysis<GISelValueTrackingAnalysisLegacy>().get(MF);
   if (OptLevel != CodeGenOptLevel::None) {
     PSI = &getAnalysis<ProfileSummaryInfoWrapperPass>().getPSI();
     if (PSI && PSI->hasProfileSummary())
@@ -113,7 +113,7 @@ bool BURSInstructionSelect::runOnMachineFunction(MachineFunction &MF) {
   }
 
   CodeGenCoverage CoverageInfo;
-  ISel->setupMF(MF, KB, &CoverageInfo, PSI, BFI);
+  ISel->setupMF(MF, VT, &CoverageInfo, PSI, BFI);
 
   // An optimization remark emitter. Used to report failures.
   MachineOptimizationRemarkEmitter MORE(MF, /*MBFI=*/nullptr);

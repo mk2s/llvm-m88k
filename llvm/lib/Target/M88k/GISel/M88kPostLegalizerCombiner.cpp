@@ -27,7 +27,7 @@
 #include "llvm/CodeGen/GlobalISel/CombinerInfo.h"
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutor.h"
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutorImpl.h"
-#include "llvm/CodeGen/GlobalISel/GISelKnownBits.h"
+#include "llvm/CodeGen/GlobalISel/GISelValueTracking.h"
 #include "llvm/CodeGen/GlobalISel/MIPatternMatch.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/Utils.h"
@@ -284,7 +284,7 @@ protected:
 public:
   M88kPostLegalizerCombinerImpl(
       MachineFunction &MF, CombinerInfo &CInfo, const TargetPassConfig *TPC,
-      GISelKnownBits &KB, GISelCSEInfo *CSEInfo,
+      GISelValueTracking &VT, GISelCSEInfo *CSEInfo,
       const M88kPostLegalizerCombinerImplRuleConfig &RuleConfig,
       const M88kSubtarget &STI, MachineDominatorTree *MDT,
       const LegalizerInfo *LI);
@@ -305,12 +305,12 @@ private:
 
 M88kPostLegalizerCombinerImpl::M88kPostLegalizerCombinerImpl(
     MachineFunction &MF, CombinerInfo &CInfo, const TargetPassConfig *TPC,
-    GISelKnownBits &KB, GISelCSEInfo *CSEInfo,
+    GISelValueTracking &VT, GISelCSEInfo *CSEInfo,
     const M88kPostLegalizerCombinerImplRuleConfig &RuleConfig,
     const M88kSubtarget &STI, MachineDominatorTree *MDT,
     const LegalizerInfo *LI)
-    : Combiner(MF, CInfo, TPC, &KB, CSEInfo),
-      Helper(Observer, B, /*IsPreLegalize*/ false, &KB, MDT, LI),
+    : Combiner(MF, CInfo, TPC, &VT, CSEInfo),
+      Helper(Observer, B, /*IsPreLegalize*/ false, &VT, MDT, LI),
       RuleConfig(RuleConfig), STI(STI),
 #define GET_GICOMBINER_CONSTRUCTOR_INITS
 #include "M88kGenPostLegalizeGICombiner.inc"
@@ -342,8 +342,8 @@ void M88kPostLegalizerCombiner::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetPassConfig>();
   AU.setPreservesCFG();
   getSelectionDAGFallbackAnalysisUsage(AU);
-  AU.addRequired<GISelKnownBitsAnalysis>();
-  AU.addPreserved<GISelKnownBitsAnalysis>();
+  AU.addRequired<GISelValueTrackingAnalysisLegacy>();
+  AU.addPreserved<GISelValueTrackingAnalysisLegacy>();
   if (!IsOptNone) {
     AU.addRequired<MachineDominatorTreeWrapperPass>();
     AU.addPreserved<MachineDominatorTreeWrapperPass>();
@@ -373,7 +373,7 @@ bool M88kPostLegalizerCombiner::runOnMachineFunction(MachineFunction &MF) {
   const M88kSubtarget &ST = MF.getSubtarget<M88kSubtarget>();
   const auto *LI = ST.getLegalizerInfo();
 
-  GISelKnownBits *KB = &getAnalysis<GISelKnownBitsAnalysis>().get(MF);
+  GISelValueTracking *VT = &getAnalysis<GISelValueTrackingAnalysisLegacy>().get(MF);
   MachineDominatorTree *MDT =
       IsOptNone ? nullptr
                 : &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
@@ -384,7 +384,7 @@ bool M88kPostLegalizerCombiner::runOnMachineFunction(MachineFunction &MF) {
   CombinerInfo CInfo(/*AllowIllegalOps*/ true, /*ShouldLegalizeIllegal*/ false,
                      /*LegalizerInfo*/ nullptr, EnableOpt, F.hasOptSize(),
                      F.hasMinSize());
-  M88kPostLegalizerCombinerImpl Impl(MF, CInfo, TPC, *KB, CSEInfo, RuleConfig,
+  M88kPostLegalizerCombinerImpl Impl(MF, CInfo, TPC, *VT, CSEInfo, RuleConfig,
                                      ST, MDT, LI);
   return Impl.combineMachineInstrs();
 }
@@ -394,7 +394,7 @@ INITIALIZE_PASS_BEGIN(M88kPostLegalizerCombiner, DEBUG_TYPE,
                       "Combine M88k machine instrs before legalization", false,
                       false)
 INITIALIZE_PASS_DEPENDENCY(TargetPassConfig)
-INITIALIZE_PASS_DEPENDENCY(GISelKnownBitsAnalysis)
+INITIALIZE_PASS_DEPENDENCY(GISelValueTrackingAnalysisLegacy)
 INITIALIZE_PASS_END(M88kPostLegalizerCombiner, DEBUG_TYPE,
                     "Combine M88k machine instrs before legalization", false,
                     false)

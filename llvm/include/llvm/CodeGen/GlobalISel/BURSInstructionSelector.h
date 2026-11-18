@@ -19,7 +19,7 @@
 namespace llvm {
 class BlockFrequencyInfo;
 class CodeGenCoverage;
-class GISelKnownBits;
+class GISelValueTracking;
 class MachineBasicBlock;
 class MachineFunction;
 class MachineInstr;
@@ -66,7 +66,7 @@ public:
 
 protected:
   CodeGenCoverage *CoverageInfo = nullptr;
-  GISelKnownBits *KB = nullptr;
+  GISelValueTracking *VT = nullptr;
   MachineFunction *MF = nullptr;
   ProfileSummaryInfo *PSI = nullptr;
   BlockFrequencyInfo *BFI = nullptr;
@@ -77,12 +77,12 @@ public:
   virtual void setupGeneratedPerFunctionState(MachineFunction &MF) = 0;
 
   /// Setup per-MF executor state.
-  virtual void setupMF(MachineFunction &MF, GISelKnownBits *KB,
+  virtual void setupMF(MachineFunction &MF, GISelValueTracking *VT,
                        CodeGenCoverage *CoverageInfo = nullptr,
                        ProfileSummaryInfo *PSI = nullptr,
                        BlockFrequencyInfo *BFI = nullptr) {
     this->CoverageInfo = CoverageInfo;
-    this->KB = KB;
+    this->VT = VT;
     this->MF = &MF;
     this->PSI = PSI;
     this->BFI = BFI;

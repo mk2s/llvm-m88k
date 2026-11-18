@@ -156,14 +156,14 @@ def sdiv_to_udiv : GICombineRule<
   (defs root:$root),
   (match (wip_match_opcode G_SDIV):$root,
          [{ return ReplaceSignedDiv; }]),
-  (apply [{ applySDivtoUDiv(Observer, *${root}, MRI, B, KB); }])>;
+  (apply [{ applySDivtoUDiv(Observer, *${root}, MRI, B, VT); }])>;
 
 def insert_div_by_zero_trap : GICombineRule<
   (defs root:$root),
   (match (wip_match_opcode G_UDIV, G_SDIV):$root,
          [{ return AddZeroDivCheck
                    && (!ReplaceSignedDiv || State.MIs[0]->getOpcode() == TargetOpcode::G_UDIV)
-                   && matchInsertDivByZeroTrap(*${root}, MRI, KB); }]),
+                   && matchInsertDivByZeroTrap(*${root}, MRI, VT); }]),
   (apply [{ applyInsertDivByZeroTrap(Observer, *${root}, MRI, B); }])>;
 
 def uitofp : GICombineRule<

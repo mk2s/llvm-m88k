@@ -36,7 +36,7 @@
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutor.h"
 #include "llvm/CodeGen/GlobalISel/GIMatchTableExecutorImpl.h"
 #include "llvm/CodeGen/GlobalISel/GISelChangeObserver.h"
-#include "llvm/CodeGen/GlobalISel/GISelKnownBits.h"
+#include "llvm/CodeGen/GlobalISel/GISelValueTracking.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/Utils.h"
 #include "llvm/CodeGen/MachineDominators.h"
@@ -95,7 +95,7 @@ MachineBasicBlock *createMBB(MachineBasicBlock *MBB, bool IsSucc = true) {
 // need to be considered. The code is a bit lengthy, but not complicated.
 bool applySDivtoUDiv(GISelChangeObserver &Observer, MachineInstr &MI,
                      MachineRegisterInfo &MRI, MachineIRBuilder &MIB,
-                     GISelKnownBits *KB) {
+                     GISelValueTracking *VT) {
   const LLT S1 = LLT::scalar(1);
   const LLT S32 = LLT::scalar(32);
 
@@ -112,8 +112,8 @@ bool applySDivtoUDiv(GISelChangeObserver &Observer, MachineInstr &MI,
 
   // Analyse numerator and denominator.
   APInt Mask = APInt::getSignMask(32);
-  KnownBits NumeratorBits = KB->getKnownBits(NumeratorReg);
-  KnownBits DenominatorBits = KB->getKnownBits(DenominatorReg);
+  KnownBits NumeratorBits = VT->getKnownBits(NumeratorReg);
+  KnownBits DenominatorBits = VT->getKnownBits(DenominatorReg);
   bool NumSignBitIsZero = Mask.isSubsetOf(NumeratorBits.Zero);
   bool NumSignBitIsOne = Mask.isSubsetOf(NumeratorBits.One);
   bool DenomSignBitIsZero = Mask.isSubsetOf(DenominatorBits.Zero);
@@ -273,11 +273,11 @@ bool applySDivtoUDiv(GISelChangeObserver &Observer, MachineInstr &MI,
 }
 
 bool matchInsertDivByZeroTrap(MachineInstr &MI, MachineRegisterInfo &MRI,
-                              GISelKnownBits *KB) {
+                              GISelValueTracking *VT) {
   Register DenominatorReg = MI.getOperand(2).getReg();
 
   // If at least 1 bit is known to be 1, then it is not a division by zero.
-  APInt KnownOnes = KB->getKnownOnes(DenominatorReg);
+  APInt KnownOnes = VT->getKnownOnes(DenominatorReg);
   if (!KnownOnes.isZero())
     return false;
 
@@ -455,7 +455,7 @@ protected:
 public:
   M88kPostLegalizerLoweringImpl(
       MachineFunction &MF, CombinerInfo &CInfo, const TargetPassConfig *TPC,
-      GISelKnownBits &KB, GISelCSEInfo *CSEInfo,
+      GISelValueTracking &VT, GISelCSEInfo *CSEInfo,
       const M88kPostLegalizerLoweringImplRuleConfig &RuleConfig,
       const M88kSubtarget &STI, MachineDominatorTree *MDT,
       const LegalizerInfo *LI, bool ReplaceSignedDiv, bool AddZeroDivCheck);
@@ -478,12 +478,12 @@ private:
 
 M88kPostLegalizerLoweringImpl::M88kPostLegalizerLoweringImpl(
     MachineFunction &MF, CombinerInfo &CInfo, const TargetPassConfig *TPC,
-    GISelKnownBits &KB, GISelCSEInfo *CSEInfo,
+    GISelValueTracking &VT, GISelCSEInfo *CSEInfo,
     const M88kPostLegalizerLoweringImplRuleConfig &RuleConfig,
     const M88kSubtarget &STI, MachineDominatorTree *MDT,
     const LegalizerInfo *LI, bool ReplaceSignedDiv, bool AddZeroDivCheck)
-    : Combiner(MF, CInfo, TPC, &KB, CSEInfo),
-      Helper(Observer, B, /*IsPreLegalize*/ false, &KB, MDT, LI),
+    : Combiner(MF, CInfo, TPC, &VT, CSEInfo),
+      Helper(Observer, B, /*IsPreLegalize*/ false, &VT, MDT, LI),
       RuleConfig(RuleConfig), STI(STI), ReplaceSignedDiv(ReplaceSignedDiv),
       AddZeroDivCheck(AddZeroDivCheck),
 #define GET_GICOMBINER_CONSTRUCTOR_INITS
@@ -543,8 +543,8 @@ void M88kPostLegalizerLowering::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<TargetPassConfig>();
   AU.setPreservesCFG();
   getSelectionDAGFallbackAnalysisUsage(AU);
-  AU.addRequired<GISelKnownBitsAnalysis>();
-  AU.addPreserved<GISelKnownBitsAnalysis>();
+  AU.addRequired<GISelValueTrackingAnalysisLegacy>();
+  AU.addPreserved<GISelValueTrackingAnalysisLegacy>();
   if (!IsOptNone) {
     AU.addRequired<MachineDominatorTreeWrapperPass>();
     AU.addPreserved<MachineDominatorTreeWrapperPass>();
@@ -579,7 +579,7 @@ bool M88kPostLegalizerLowering::runOnMachineFunction(MachineFunction &MF) {
   const M88kSubtarget &ST = MF.getSubtarget<M88kSubtarget>();
   const auto *LI = ST.getLegalizerInfo();
 
-  GISelKnownBits *KB = &getAnalysis<GISelKnownBitsAnalysis>().get(MF);
+  GISelValueTracking *VT = &getAnalysis<GISelValueTrackingAnalysisLegacy>().get(MF);
   MachineDominatorTree *MDT =
       IsOptNone ? nullptr
                 : &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
@@ -590,7 +590,7 @@ bool M88kPostLegalizerLowering::runOnMachineFunction(MachineFunction &MF) {
   CombinerInfo CInfo(/*AllowIllegalOps*/ true, /*ShouldLegalizeIllegal*/ false,
                      /*LegalizerInfo*/ nullptr, EnableOpt, F.hasOptSize(),
                      F.hasMinSize());
-  M88kPostLegalizerLoweringImpl Impl(MF, CInfo, TPC, *KB, CSEInfo, RuleConfig,
+  M88kPostLegalizerLoweringImpl Impl(MF, CInfo, TPC, *VT, CSEInfo, RuleConfig,
                                      ST, MDT, LI, ReplaceSignedDiv,
                                      AddZeroDivCheck);
   return Impl.combineMachineInstrs();
@@ -601,7 +601,7 @@ INITIALIZE_PASS_BEGIN(M88kPostLegalizerLowering, DEBUG_TYPE,
                       "Lower M88k MachineInstrs after legalization", false,
                       false)
 INITIALIZE_PASS_DEPENDENCY(TargetPassConfig)
-INITIALIZE_PASS_DEPENDENCY(GISelKnownBitsAnalysis)
+INITIALIZE_PASS_DEPENDENCY(GISelValueTrackingAnalysisLegacy)
 INITIALIZE_PASS_END(M88kPostLegalizerLowering, DEBUG_TYPE,
                     "Lower M88k MachineInstrs after legalization", false, false)
 
