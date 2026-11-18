@@ -271,7 +271,9 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder(G_FPTRUNC).legalFor({{S32, S64}});
 
   getActionDefinitionsBuilder(
-      {G_FCOS, G_FSIN, G_FLOG10, G_FLOG, G_FLOG2, G_FEXP, G_FEXP2, G_FPOW})
+      {G_FCOS, G_FSIN, G_FTAN, G_FACOS, G_FASIN, G_FATAN, G_FATAN2, G_FCOSH,
+       G_FSINH, G_FTANH, G_FLOG10, G_FLOG, G_FLOG2, G_FEXP, G_FEXP2, G_FEXP10,
+       G_FPOW})
       .minScalar(0, S32)
       .libcallFor({S32, S64});
   getActionDefinitionsBuilder(G_FSQRT)
