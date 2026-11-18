@@ -1021,9 +1021,15 @@ class FloatPat<FloatType D, FloatType S1, FloatType S2, SDPatternOperator op> {
   defvar dags2 = FloatSrc2<S1, S2>.val;
   defvar extend = !and(!gt(D.size, S1.size), !gt(D.size, S2.size));
   defvar round = !or(!lt(D.size, S1.size), !lt(D.size, S2.size));
-  dag val = !cond(extend : (D.vt (fpextend (op dags1, dags2))),
-                  round : (D.vt (fpround (op dags1, dags2))),
+  // The instruction converts both operands to the destination precision and
+  // rounds the result once. That equals (op (fpext a), (fpext b)), not
+  // (fpext (op a, b)), which rounds to the narrower type first. For the same
+  // reason (fpround (op a, b)) is not matched: the instruction rounds the exact
+  // result once instead of twice.
+  dag val = !cond(extend : (op (D.vt (fpextend (S1.vt S1.cls:$rs1))),
+                               (D.vt (fpextend (S2.vt S2.cls:$rs2)))),
                   true: (op dags1, dags2));
+  bit valid = !not(round);
 }
 
 // Multiclass for triadic register floating point instructions.
@@ -1036,7 +1042,9 @@ multiclass FArith<bits<4> Func, string OpcStr, SDPatternOperator op> {
                   F_SFU1T<Func, D.enc, S1.enc, S2.enc,
                       (outs D.cls:$rd), (ins S1.cls:$rs1, S2.cls:$rs2),
                       !strconcat(OpcStr, ".", D.option, S1.option, S2.option),
-                      [(set (D.vt D.cls:$rd), FloatPat<D, S1, S2, op>.val)]>;
+                      !if(FloatPat<D, S1, S2, op>.valid,
+                          [(set (D.vt D.cls:$rd), FloatPat<D, S1, S2, op>.val)],
+                          [])>;
         }
       }
     }
@@ -1049,7 +1057,9 @@ multiclass FArith<bits<4> Func, string OpcStr, SDPatternOperator op> {
                   F_SFU1T<Func, D.enc, S1.enc, S2.enc,
                       (outs D.cls:$rd), (ins S1.cls:$rs1, S2.cls:$rs2),
                       !strconcat(OpcStr, ".", D.option, S1.option, S2.option),
-                      [(set (D.vt D.cls:$rd), FloatPat<D, S1, S2, op>.val)]>;
+                      !if(FloatPat<D, S1, S2, op>.valid,
+                          [(set (D.vt D.cls:$rd), FloatPat<D, S1, S2, op>.val)],
+                          [])>;
         }
       }
     }
