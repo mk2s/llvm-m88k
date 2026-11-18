@@ -13,6 +13,7 @@
 
 #include "llvm/CodeGen/GlobalISel/InlineAsmLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
+#include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineOperand.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/TargetLowering.h"
@@ -454,26 +455,36 @@ bool InlineAsmLowering::lowerInlineAsm(
       }
 
       if (OpInfo.ConstraintType == TargetLowering::C_Memory) {
-
-        if (!OpInfo.isIndirect) {
-          LLVM_DEBUG(dbgs()
-                     << "Cannot indirectify memory input operands yet\n");
+        ArrayRef<Register> SourceRegs =
+            GetOrCreateVRegs(*OpInfo.CallOperandVal);
+        if (SourceRegs.size() != 1) {
+          LLVM_DEBUG(dbgs() << "Memory input operand does not fit into a "
+                               "single virtual register\n");
           return false;
         }
-
-        assert(OpInfo.isIndirect && "Operand must be indirect to be a mem!");
-
+        Register AddrReg = SourceRegs[0];
+        if (!OpInfo.isIndirect) {
+          // The value is not in memory (e.g. an "rm" or "m" operand that is a
+          // plain value): spill it to a stack temporary and pass the address,
+          // as SelectionDAG does.
+          Type *Ty = OpInfo.CallOperandVal->getType();
+          const Align Alignment = DL.getPrefTypeAlign(Ty);
+          int FI = MF.getFrameInfo().CreateStackObject(
+              DL.getTypeAllocSize(Ty), Alignment, false);
+          unsigned AS = DL.getAllocaAddrSpace();
+          auto Addr = MIRBuilder.buildFrameIndex(
+              LLT::pointer(AS, DL.getPointerSizeInBits(AS)), FI);
+          MIRBuilder.buildStore(AddrReg, Addr,
+                                MachinePointerInfo::getFixedStack(MF, FI),
+                                Alignment);
+          AddrReg = Addr.getReg(0);
+        }
         const InlineAsm::ConstraintCode ConstraintID =
             TLI->getInlineAsmMemConstraint(OpInfo.ConstraintCode);
         InlineAsm::Flag OpFlags(InlineAsm::Kind::Mem, 1);
         OpFlags.setMemConstraint(ConstraintID);
         Inst.addImm(OpFlags);
-        ArrayRef<Register> SourceRegs =
-            GetOrCreateVRegs(*OpInfo.CallOperandVal);
-        assert(
-            SourceRegs.size() == 1 &&
-            "Expected the memory input to fit into a single virtual register");
-        Inst.addReg(SourceRegs[0]);
+        Inst.addReg(AddrReg);
         break;
       }
 

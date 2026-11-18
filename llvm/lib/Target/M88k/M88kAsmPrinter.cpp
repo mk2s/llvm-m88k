@@ -56,6 +56,8 @@ public:
 
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                        const char *ExtraCode, raw_ostream &OS) override;
+  bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo,
+                             const char *ExtraCode, raw_ostream &OS) override;
   void emitInstruction(const MachineInstr *MI) override;
 };
 } // end of anonymous namespace
@@ -68,6 +70,22 @@ bool M88kAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   MCOperand MO(Lower.lowerOperand(MI->getOperand(OpNo),
                                   MF->getSubtarget().getRegisterInfo()));
   M88kInstPrinter::printOperand(MO, MAI, OS);
+  return false;
+}
+
+// A memory operand ("m") is the address in a register. Print it as the
+// register-register form "%r0,%rN", as GCC does for a plain register address,
+// so it can be used as the address part of ld, st and xmem.
+bool M88kAsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
+                                           unsigned OpNo,
+                                           const char *ExtraCode,
+                                           raw_ostream &OS) {
+  if (ExtraCode && ExtraCode[0])
+    return true; // Unknown modifier.
+  const MachineOperand &MO = MI->getOperand(OpNo);
+  if (!MO.isReg())
+    return true;
+  OS << "%r0, %" << M88kInstPrinter::getRegisterName(MO.getReg());
   return false;
 }
 
