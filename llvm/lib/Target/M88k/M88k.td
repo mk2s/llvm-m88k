@@ -61,6 +61,7 @@ def : ProcessorModel<"mc88110", M88110SchedModel, [Proc88110]>;
 // Declare the target which we are implementing
 //===----------------------------------------------------------------------===//
 
+defm : RemapAllTargetPseudoPointerOperands<GPR>;
 def M88kInstrInfo : InstrInfo;
 def M88kAsmParser : AsmParser {
   let ShouldEmitMatchRegisterAltName = 1;
