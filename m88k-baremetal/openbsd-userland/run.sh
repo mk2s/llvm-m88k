@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: run.sh [TEST ...]   (default: all tests in tests/ and tests/interop)
-# Compiles programs with the in-tree clang + ld.lld (static, against the OpenBSD 7.1 luna88k libc.a in
-# $OBSD) and, as the reference, with OpenBSD's own GCC 3.3.6 `cc -c` (run under run88k; linked with
+# Compiles programs with the in-tree clang + ld.lld (static against the OpenBSD 7.1 luna88k libc.a, and
+# dynamic against libc.so through the clang driver, both from $OBSD) and, as the reference, with OpenBSD's own GCC 3.3.6 `cc -c` (run under run88k; linked with
 # the same ld.lld because the guest's libgcc.a is truncated), runs them in run88k and compares the output. Clang is built at -O0 and -O2. tests/k*.c exercise known issues (llvm/lib/Target/M88k/KNOWN_ISSUES.md)
 # and are reported as KNOWN, not as failures. tests/*interop*/{lib,main}.c are built with every combination of
 # gcc/clang for the two halves and linked with lld (kinterop*: mixed builds are a known issue).
@@ -15,9 +15,16 @@ WORK="${WORK:-/tmp/m88k-ou}"
 TMO="${TMO:-300}"
 CLANG="$LLVM/build/bin/clang --target=m88k-unknown-openbsd --sysroot=$OBSD -fno-pic -w"
 LLD="$LLVM/build/bin/ld.lld"
-RT="$($LLVM/build/bin/clang --target=m88k-unknown-none-elf -rtlib=compiler-rt -print-libgcc-file-name)"
+# compiler-rt built for m88k-unknown-openbsd by ./build-rt.sh: it must not touch r26/r27.
+RT="$($LLVM/build/bin/clang --target=m88k-unknown-openbsd -rtlib=compiler-rt -print-libgcc-file-name)"
 L="$OBSD/usr/lib"
-mkdir -p "$WORK/bin" "$WORK/obj" "$WORK/out"
+mkdir -p "$WORK/bin" "$WORK/obj" "$WORK/out" "$WORK/lib"
+# Dynamic links go through the clang driver. lld does not search versioned lib*.so.N.M names
+# (OpenBSD's own linkers do), so provide unversioned links, and compiler-rt as -lcompiler_rt.
+ln -sf "$OBSD/usr/lib/$(cd "$OBSD/usr/lib" && ls libc.so.* | sort -V | tail -1)" "$WORK/lib/libc.so"
+ln -sf "$OBSD/usr/lib/$(cd "$OBSD/usr/lib" && ls libm.so.* | sort -V | tail -1)" "$WORK/lib/libm.so"
+cp -f "$RT" "$WORK/lib/libcompiler_rt.a"
+CLANGLD="$LLVM/build/bin/clang --target=m88k-unknown-openbsd --sysroot=$OBSD -fuse-ld=lld -L$WORK/lib -w"
 r88() { timeout "$TMO" "$RUN88K" --os openbsd --root "$OBSD" --mount /work="$WORK" --cwd /work "$@"; }
 gcc_cc() { r88 run "$OBSD/usr/bin/cc" -std=gnu99 "$@"; }
 link() { local out="$1"; shift; $LLD -e __start -static -o "$out" "$L/crt0.o" "$L/crtbegin.o" "$@" "$L/libm.a" "$L/libc.a" "$RT" "$L/crtend.o"; }
@@ -67,8 +74,13 @@ for t in "${tests[@]}"; do
   for opt in 0 2; do
     if $CLANG -O$opt -c "$src" -o "$WORK/obj/$t.o" 2> "$WORK/out/$t.cerr" && link "$WORK/bin/${t}_O$opt" "$WORK/obj/$t.o" 2> "$WORK/out/$t.lerr"; then
       runbin "$WORK/bin/${t}_O$opt" > "$WORK/out/$t.O$opt.out"
-      diff -q "$WORK/out/$t.ref" "$WORK/out/$t.O$opt.out" > /dev/null; report "$t" "clang -O$opt" $?
+      diff -q "$WORK/out/$t.ref" "$WORK/out/$t.O$opt.out" > /dev/null; report "$t" "clang -O$opt static" $?
     else report "$t" "clang -O$opt build FAILED:" 1; head -3 "$WORK/out/$t.cerr" "$WORK/out/$t.lerr"; fi
+    # dynamic executable (libc.so via ld.so), linked by the clang driver
+    if $CLANGLD -O$opt "$src" -o "$WORK/bin/${t}_O${opt}dyn" -lm 2> "$WORK/out/$t.dlerr"; then
+      runbin "$WORK/bin/${t}_O${opt}dyn" > "$WORK/out/$t.O${opt}dyn.out"
+      diff -q "$WORK/out/$t.ref" "$WORK/out/$t.O${opt}dyn.out" > /dev/null; report "$t" "clang -O$opt dynamic" $?
+    else report "$t" "clang -O$opt dynamic build FAILED:" 1; head -3 "$WORK/out/$t.dlerr"; fi
   done
 done
 echo "pass=$pass fail=$fail known-issue=$known reference-differs=$refdiff (outputs in $WORK/out)"
