@@ -25,7 +25,9 @@
 #                   RT_BUILD_DIR_<TRIPLE with - replaced by _>)
 #   RT_DIR_SUFFIX   appended to the default compiler-rt build dir names (e.g. "-22" -> build-rt-m88k-22)
 #   M88K_CPU        -mcpu for compiler-rt and bare-metal tests (default mc88100)
-#   JOBS            parallelism (default: nproc)
+#   JOBS            parallelism for lit and the compiler-rt build (default: min(nproc, 6); the
+#                   LLVM 22.1 port was OOM-killed twice on 14 GB RAM with unlimited jobs)
+#   LOAD            ninja load limit, passed as -l to the compiler-rt build (default: JOBS+2)
 #   MAME_PORT_BASE  first TCP port used by run-ncd19c.py (default 2340)
 #   MAME_WALL       wall-clock limit in seconds per bare-metal test (default 300)
 #   BAREMETAL_TESTS space separated test names (default: every tests/*.c)
@@ -47,7 +49,9 @@ LLDB_BUILD="${LLDB_BUILD_DIR:-$SRC/build-lldb}"
 RT_TRIPLES="${RT_TRIPLES:-m88k-unknown-none-elf m88k-unknown-openbsd}"
 RT_DIR_SUFFIX="${RT_DIR_SUFFIX:-}"
 CPU="${M88K_CPU:-mc88100}"
-JOBS="${JOBS:-$(nproc 2>/dev/null || echo 4)}"
+_np="$(nproc 2>/dev/null || echo 4)"
+JOBS="${JOBS:-$(( _np < 6 ? _np : 6 ))}"
+LOAD="${LOAD:-$(( JOBS + 2 ))}"
 PORT_BASE="${MAME_PORT_BASE:-2340}"
 WALL="${MAME_WALL:-300}"
 BM="$SRC/m88k-baremetal/ncd19c"
@@ -187,7 +191,7 @@ step_rt() {
         > "$LOGS/rt-$t.configure.log" 2>&1 || { rec "rt/$t/configure FAIL"; continue; }
       rec "rt/$t/configure PASS"
     fi
-    if cmake --build "$d" --target builtins -j "$JOBS" > "$LOGS/rt-$t.build.log" 2>&1; then
+    if cmake --build "$d" --target builtins -- -j"$JOBS" -l"$LOAD" > "$LOGS/rt-$t.build.log" 2>&1; then
       rec "rt/$t/build PASS"
       if cmake --install "$d" --component builtins > "$LOGS/rt-$t.install.log" 2>&1 ||
          cmake --install "$d" > "$LOGS/rt-$t.install.log" 2>&1; then
