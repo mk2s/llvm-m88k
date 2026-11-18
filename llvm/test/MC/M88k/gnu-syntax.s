@@ -240,7 +240,7 @@
   addu r1, r1, (0xffff & ( foo - . - 4))
   ld r2, r3, 4*4
 # CHECK: or %r2, %r0, 16 {{.*}}| encoding: [0x58,0x40,0x00,0x10]
-# CHECK: addu %r1, %r1, 65535&((foo-.Ltmp0)-4) {{.*}}| encoding: [0x60,0x21,A,A]
+# CHECK: addu %r1, %r1, 65535&(foo-.Ltmp0-4) {{.*}}| encoding: [0x60,0x21,A,A]
 # CHECK: ld %r2, %r3, 16 {{.*}}| encoding: [0x14,0x43,0x00,0x10]
 
 foo:
