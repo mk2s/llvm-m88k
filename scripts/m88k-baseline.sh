@@ -79,7 +79,7 @@ if [ "$BACKGROUND" = 1 ]; then
 fi
 
 : > "$RAW"
-rec() { printf '%s %s\n' "$1" "$2" >> "$RAW"; }
+rec() { printf '%s\n' "$*" >> "$RAW"; }
 log() { printf '[baseline] %s\n' "$*" >&2; }
 
 # ---- meta -------------------------------------------------------------------
@@ -137,7 +137,8 @@ step_lldb() {
   if [ ! -x "$lldb" ]; then log "no $lldb"; rec lldb/_step ERROR; return; fi
   # smoke: binary starts and the M88k ABI plugin is linked in
   if "$lldb" -b -o version > "$LOGS/lldb-smoke.log" 2>&1; then rec lldb/smoke-version PASS; else rec lldb/smoke-version FAIL; fi
-  if "$lldb" -b -o 'plugin list' >> "$LOGS/lldb-smoke.log" 2>&1 && grep -qi m88k "$LOGS/lldb-smoke.log"; then
+  # this lldb has no "plugin list" subcommand; look for the ABI plugin in the linked library
+  if grep -qa 'ABISysV_m88k' "$LLDB_BUILD"/lib/liblldb.so* "$lldb" 2>/dev/null; then
     rec lldb/smoke-abi-plugin PASS
   else
     rec lldb/smoke-abi-plugin FAIL
