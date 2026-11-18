@@ -146,7 +146,7 @@ ArrayRef<const char *> M88kTargetInfo::getGCCRegNames() const {
 
 ArrayRef<TargetInfo::GCCRegAlias> M88kTargetInfo::getGCCRegAliases() const {
   // No aliases.
-  return std::nullopt;
+  return {};
 }
 
 bool M88kTargetInfo::validateAsmConstraint(
