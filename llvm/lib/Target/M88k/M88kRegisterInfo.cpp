@@ -76,6 +76,18 @@ BitVector M88kRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   Reserved.set(M88k::R28);
   Reserved.set(M88k::R29);
 
+  // On OpenBSD R27 holds the thread information block pointer (set up by ld.so
+  // and read by libc), and R26 is not allocated by OpenBSD's GCC either. A
+  // compiler that allocates them corrupts libc's view of the thread.
+  if (MF.getTarget().getTargetTriple().isOSOpenBSD()) {
+    for (MCRegister Reg : {M88k::R26, M88k::R27}) {
+      Reserved.set(Reg);
+      // Also reserve the register pairs containing them.
+      for (MCPhysReg SuperReg : superregs(Reg))
+        Reserved.set(SuperReg);
+    }
+  }
+
   // R31 is the stack pointer.
   Reserved.set(M88k::R31);
 
