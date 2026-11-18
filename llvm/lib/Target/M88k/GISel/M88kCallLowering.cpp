@@ -22,6 +22,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/CallingConvLower.h"
+#include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/CodeGen/GlobalISel/CallLowering.h"
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
 #include "llvm/CodeGen/GlobalISel/Utils.h"
@@ -33,6 +34,7 @@
 #include "llvm/CodeGen/TargetFrameLowering.h"
 #include "llvm/CodeGenTypes/LowLevelType.h"
 #include "llvm/Support/Alignment.h"
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -125,43 +127,72 @@ void OutgoingArgHandler::assignValueToReg(Register ValVReg, Register PhysReg,
   MIRBuilder.buildCopy(PhysReg, ExtReg);
 }
 
+// A value with 64-bit parts (i64, f64, and wider or odd-sized integers such as
+// i52 or i128 that are split into i64 parts) is passed part by part. A part
+// that got a register pair has two custom locations (hi, lo); a part that did
+// not fit is a single stack location.
 unsigned OutgoingArgHandler::assignCustomValue(CallLowering::ArgInfo &Arg,
                                                ArrayRef<CCValAssign> VAs,
                                                std::function<void()> *Thunk) {
   assert(Arg.Regs.size() == 1 && "Can't handle multple regs yet");
-
-  CCValAssign HiVA = VAs[0];
-  assert(HiVA.needsCustom() && "Value doesn't need custom handling");
-
+  assert(VAs[0].needsCustom() && "Value doesn't need custom handling");
   // Custom lowering for other types, such as f16, is currently not supported.
-  if (HiVA.getValVT() != MVT::f64 && HiVA.getValVT() != MVT::i64)
+  if (VAs[0].getValVT() != MVT::f64 && VAs[0].getValVT() != MVT::i64)
     return 0;
 
-  CCValAssign LoVA = VAs[1];
-  assert(LoVA.needsCustom() && "Value doesn't need custom handling");
-  assert((LoVA.getValVT() == MVT::f64 || HiVA.getValVT() == MVT::i64) &&
-         "Unsupported type");
-
-  assert(HiVA.getValNo() == LoVA.getValNo() &&
-         "Values belong to different arguments");
-
-  assert(HiVA.isRegLoc() && "Value should be in reg");
-  assert(LoVA.isRegLoc() && "Value should be in reg");
-
-  Register NewRegs[] = {MRI.createGenericVirtualRegister(LLT::scalar(32)),
-                        MRI.createGenericVirtualRegister(LLT::scalar(32))};
-  MIRBuilder.buildUnmerge(NewRegs, Arg.Regs[0]);
-
-  if (Thunk) {
-    *Thunk = [=]() {
-      assignValueToReg(NewRegs[0], LoVA.getLocReg(), LoVA);
-      assignValueToReg(NewRegs[1], HiVA.getLocReg(), HiVA);
-    };
-    return 2;
+  const LLT S32 = LLT::scalar(32);
+  const LLT S64 = LLT::scalar(64);
+  const unsigned NumParts = std::max<size_t>(1, Arg.Flags.size());
+  const LLT WideTy = LLT::scalar(64 * NumParts);
+  Register Val = Arg.Regs[0];
+  LLT ValTy = MRI.getType(Val);
+  if (ValTy.isScalar() && ValTy.getSizeInBits() < WideTy.getSizeInBits())
+    Val = MIRBuilder.buildAnyExt(WideTy, Val).getReg(0);
+  SmallVector<Register, 4> Parts;
+  if (NumParts == 1) {
+    Parts.push_back(Val);
+  } else {
+    for (unsigned I = 0; I < NumParts; ++I)
+      Parts.push_back(MRI.createGenericVirtualRegister(S64));
+    // Big endian: the first part is the most significant one.
+    SmallVector<Register, 4> LowFirst(Parts.rbegin(), Parts.rend());
+    MIRBuilder.buildUnmerge(LowFirst, Val);
   }
-  assignValueToReg(NewRegs[0], LoVA.getLocReg(), LoVA);
-  assignValueToReg(NewRegs[1], HiVA.getLocReg(), HiVA);
-  return 2;
+
+  SmallVector<std::pair<Register, CCValAssign>, 8> RegAssigns;
+  unsigned K = 0;
+  for (unsigned P = 0; P < NumParts; ++P) {
+    assert(K < VAs.size() && "Not enough locations");
+    const CCValAssign &VA = VAs[K];
+    if (VA.isRegLoc()) {
+      assert(VA.needsCustom() && K + 1 < VAs.size() &&
+             VAs[K + 1].isRegLoc() && "Expected a register pair");
+      Register Halves[] = {MRI.createGenericVirtualRegister(S32),
+                           MRI.createGenericVirtualRegister(S32)};
+      MIRBuilder.buildUnmerge(Halves, Parts[P]);
+      RegAssigns.push_back({Halves[0], VAs[K + 1]}); // lo
+      RegAssigns.push_back({Halves[1], VAs[K]});     // hi
+      K += 2;
+    } else {
+      MachinePointerInfo MPO;
+      Register Addr = getStackAddress(8, VA.getLocMemOffset(), MPO,
+                                      Arg.Flags[P < Arg.Flags.size() ? P : 0]);
+      Register Part = Parts[P];
+      if (MRI.getType(Part) != S64)
+        Part = MIRBuilder.buildBitcast(S64, Part).getReg(0);
+      assignValueToAddress(Part, Addr, S64, MPO, VA);
+      K += 1;
+    }
+  }
+  auto AssignRegs = [this, RegAssigns]() {
+    for (const auto &[Reg, VA] : RegAssigns)
+      assignValueToReg(Reg, VA.getLocReg(), VA);
+  };
+  if (Thunk)
+    *Thunk = AssignRegs;
+  else
+    AssignRegs();
+  return K;
 }
 
 void OutgoingArgHandler::assignValueToAddress(Register ValVReg, Register Addr,
@@ -250,34 +281,73 @@ M88kIncomingValueHandler::assignCustomValue(CallLowering::ArgInfo &Arg,
                                             ArrayRef<CCValAssign> VAs,
                                             std::function<void()> *Thunk) {
   assert(Arg.Regs.size() == 1 && "Can't handle multple regs yet");
-
-  CCValAssign HiVA = VAs[0];
-  assert(HiVA.needsCustom() && "Value doesn't need custom handling");
-
+  assert(VAs[0].needsCustom() && "Value doesn't need custom handling");
   // Custom lowering for other types is currently not supported.
-  if (HiVA.getValVT() != MVT::f64 && HiVA.getValVT() != MVT::i64)
+  if (VAs[0].getValVT() != MVT::f64 && VAs[0].getValVT() != MVT::i64)
     return 0;
 
-  CCValAssign LoVA = VAs[1];
-  assert(LoVA.needsCustom() && "Value doesn't need custom handling");
-  assert((LoVA.getValVT() == MVT::f64 || LoVA.getValVT() == MVT::i64) &&
-         "Unsupported type");
+  const LLT S32 = LLT::scalar(32);
+  const LLT S64 = LLT::scalar(64);
+  const unsigned NumParts = std::max<size_t>(1, Arg.Flags.size());
+  Register Dst = Arg.Regs[0];
+  LLT DstTy = MRI.getType(Dst);
+  // A plain i64/f64 value is assembled directly in its virtual register.
+  const bool Direct = NumParts == 1 && DstTy == S64;
+  SmallVector<Register, 4> Parts;
+  unsigned K = 0;
+  for (unsigned P = 0; P < NumParts; ++P) {
+    assert(K < VAs.size() && "Not enough locations");
+    const CCValAssign &VA = VAs[K];
+    Register Part = Direct ? Dst : MRI.createGenericVirtualRegister(S64);
+    if (VA.isRegLoc()) {
+      assert(VA.needsCustom() && K + 1 < VAs.size() &&
+             VAs[K + 1].isRegLoc() && "Expected a register pair");
+      Register Halves[] = {MRI.createGenericVirtualRegister(S32),
+                           MRI.createGenericVirtualRegister(S32)};
+      assignValueToReg(Halves[0], VAs[K + 1].getLocReg(), VAs[K + 1]); // lo
+      assignValueToReg(Halves[1], VAs[K].getLocReg(), VAs[K]);         // hi
+      MIRBuilder.buildMergeLikeInstr(Part, Halves);
+      K += 2;
+    } else {
+      MachinePointerInfo MPO;
+      Register Addr = getStackAddress(8, VA.getLocMemOffset(), MPO,
+                                      Arg.Flags[P < Arg.Flags.size() ? P : 0]);
+      assignValueToAddress(Part, Addr, S64, MPO, VA);
+      K += 1;
+    }
+    Parts.push_back(Part);
+  }
 
-  assert(HiVA.getValNo() == LoVA.getValNo() &&
-         "Values belong to different arguments");
+  if (Direct)
+    return K;
+  if (NumParts == 1 && DstTy.getSizeInBits() == 64) {
+    MIRBuilder.buildBitcast(Dst, Parts[0]);
+    return K;
+  }
+  if (NumParts == 1) {
+    MIRBuilder.buildTrunc(Dst, Parts[0]);
+    return K;
+  }
+  // Big endian: the first part is the most significant one.
+  SmallVector<Register, 4> LowFirst(Parts.rbegin(), Parts.rend());
+  const LLT WideTy = LLT::scalar(64 * NumParts);
+  if (DstTy.getSizeInBits() == WideTy.getSizeInBits()) {
+    MIRBuilder.buildMergeLikeInstr(Dst, LowFirst);
+  } else {
+    auto Wide = MIRBuilder.buildMergeLikeInstr(WideTy, LowFirst);
+    MIRBuilder.buildTrunc(Dst, Wide);
+  }
+  return K;
+}
 
-  assert(HiVA.isRegLoc() && "Value should be in reg");
-  assert(LoVA.isRegLoc() && "Value should be in reg");
-
-  Register NewRegs[] = {MRI.createGenericVirtualRegister(LLT::scalar(32)),
-                        MRI.createGenericVirtualRegister(LLT::scalar(32))};
-
-  assignValueToReg(NewRegs[0], LoVA.getLocReg(), LoVA);
-  assignValueToReg(NewRegs[1], HiVA.getLocReg(), HiVA);
-
-  MIRBuilder.buildMergeLikeInstr(Arg.Regs[0], NewRegs);
-
-  return 2;
+bool M88kCallLowering::canLowerReturn(MachineFunction &MF,
+                                      CallingConv::ID CallConv,
+                                      SmallVectorImpl<BaseArgInfo> &Outs,
+                                      bool IsVarArg) const {
+  SmallVector<CCValAssign, 16> ArgLocs;
+  CCState CCInfo(CallConv, IsVarArg, MF, ArgLocs,
+                 MF.getFunction().getContext());
+  return checkReturn(CCInfo, Outs, RetCC_M88k);
 }
 
 bool M88kCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
@@ -291,8 +361,12 @@ bool M88kCallLowering::lowerReturn(MachineIRBuilder &MIRBuilder,
 
   auto MIB = MIRBuilder.buildInstrNoInsert(M88k::RET);
 
-  bool Success = true;
-  if (!VRegs.empty()) {
+    bool Success = true;
+  if (!FLI.CanLowerReturn) {
+    // The value does not fit into r2/r3: store it through the hidden sret
+    // pointer (r12) instead.
+    insertSRetStores(MIRBuilder, Val->getType(), VRegs, FLI.DemoteRegister);
+  } else if (!VRegs.empty()) {
     SmallVector<ArgInfo, 8> SplitArgs;
     ArgInfo OrigArg{VRegs, Val->getType(), 0};
     setArgFlags(OrigArg, AttributeList::ReturnIndex, DL, F);
@@ -316,7 +390,10 @@ bool M88kCallLowering::lowerFormalArguments(MachineIRBuilder &MIRBuilder,
   MachineRegisterInfo &MRI = MF.getRegInfo();
   const auto &DL = F.getParent()->getDataLayout();
 
-  SmallVector<ArgInfo, 8> SplitArgs;
+    SmallVector<ArgInfo, 8> SplitArgs;
+  // Hidden sret pointer (r12) if the return value does not fit into r2/r3.
+  if (!FLI.CanLowerReturn)
+    insertSRetIncomingArgument(F, SplitArgs, FLI.DemoteRegister, MRI, DL);
   unsigned I = 0;
   for (const auto &Arg : F.args()) {
     ArgInfo OrigArg{VRegs[I], Arg.getType(), I};
@@ -421,8 +498,8 @@ bool M88kCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
     splitToValueTypes(OrigArg, OutArgs, DL, Info.CallConv);
   }
 
-  SmallVector<ArgInfo, 8> InArgs;
-  if (!Info.OrigRet.Ty->isVoidTy())
+    SmallVector<ArgInfo, 8> InArgs;
+  if (Info.CanLowerReturn && !Info.OrigRet.Ty->isVoidTy())
     splitToValueTypes(Info.OrigRet, InArgs, DL, Info.CallConv);
 
   // TODO Handle tail calls.
@@ -463,7 +540,7 @@ bool M88kCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
   // Finally we can copy the returned value back into its virtual-register. In
   // symmetry with the arguments, the physical register must be an
   // implicit-define of the call instruction.
-  if (!Info.OrigRet.Ty->isVoidTy()) {
+    if (Info.CanLowerReturn && !Info.OrigRet.Ty->isVoidTy()) {
     OutgoingValueAssigner ArgAssigner(RetCC_M88k);
     CallReturnHandler ReturnedArgHandler(MIRBuilder, MRI, MIB);
     if (!determineAndHandleAssignments(ReturnedArgHandler, ArgAssigner, InArgs,
@@ -484,7 +561,11 @@ bool M88kCallLowering::lowerCall(MachineIRBuilder &MIRBuilder,
       alignTo(ArgAssigner.StackSize, TFL->getStackAlign());
   if (AlignedCallFrameSize > MFI.getMaxCallFrameSize())
     MFI.setMaxCallFrameSize(AlignedCallFrameSize);
-  MFI.setAdjustsStack(true);
+    MFI.setAdjustsStack(true);
 
+  // The return value was demoted to memory: load it from the sret slot.
+  if (!Info.CanLowerReturn)
+    insertSRetLoads(MIRBuilder, Info.OrigRet.Ty, Info.OrigRet.Regs,
+                    Info.DemoteRegister, Info.DemoteStackIndex);
   return true;
 }
