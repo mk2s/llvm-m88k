@@ -622,6 +622,7 @@ def: Flag<["-"], "N">, Alias<omagic>, HelpText<"Alias for --omagic">;
 def: Joined<["--"], "output=">, Alias<o>, HelpText<"Alias for -o">;
 def: Separate<["--"], "output">, Alias<o>, HelpText<"Alias for -o">;
 def: F<"pic-executable">, Alias<pie>, HelpText<"Alias for --pie">;
+def: F<"nopie">, Alias<no_pie>, HelpText<"Alias for --no-pie">;
 def: Flag<["-"], "M">, Alias<print_map>, HelpText<"Alias for --print-map">;
 def: Flag<["-"], "r">, Alias<relocatable>, HelpText<"Alias for --relocatable">;
 def: JoinedOrSeparate<["-"], "R">, Alias<rpath>, HelpText<"Alias for --rpath">;

@@ -1509,6 +1509,12 @@ DynamicSection<ELFT>::computeContents() {
       break;
     }
     addInt(DT_PLTREL, ctx.arg.isRela ? DT_RELA : DT_REL);
+    // OpenBSD's ld.so flushes the instruction cache over this range after
+    // patching the PLT (DT_88K_PLTSTART, DT_88K_PLTEND).
+    if (ctx.arg.emachine == EM_88K && ctx.in.plt->isNeeded()) {
+      addInSec(0x70000002, *ctx.in.plt);
+      addInt(0x70000003, ctx.in.plt->getVA() + ctx.in.plt->getSize());
+    }
   }
 
   if (ctx.arg.emachine == EM_AARCH64) {
@@ -2603,9 +2609,9 @@ PltSection::PltSection(Ctx &ctx)
       (ctx.arg.andFeatures & GNU_PROPERTY_X86_FEATURE_1_IBT))
     name = ".plt.sec";
 
-  // The PLT needs to be writable on SPARC as the dynamic linker will
+  // The PLT needs to be writable on SPARC and M88k as the dynamic linker will
   // modify the instructions in the PLT entries.
-  if (ctx.arg.emachine == EM_SPARCV9)
+  if (ctx.arg.emachine == EM_SPARCV9 || ctx.arg.emachine == EM_88K)
     this->flags |= SHF_WRITE;
 }
 
