@@ -127,6 +127,9 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
           all(typePairAndMemDescInSet(/*TypeIdx0*/ 0, /*TypeIdx1*/ 1,
                                       /*MMOIdx*/ 0, {{S80, P0, S128, 128}}),
               IsMC88110))
+            // Split loads/stores of non power-of-2 memory sizes (e.g. i52) first,
+      // the rules below assume the memory size fits the narrowed type.
+      .lowerIfMemSizeNotPow2()
       .clampScalar(0, S32, S32)
       // Custom action if unaligned load/store.
       // TODO Does not handle f80 type.
@@ -189,6 +192,8 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .libcallFor({S64})
       .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S64);
+    // The combiner merges div and rem of the same operands into G_[SU]DIVREM.
+  getActionDefinitionsBuilder({G_SDIVREM, G_UDIVREM}).lower();
   getActionDefinitionsBuilder({G_SREM, G_UREM})
       .lowerFor({S32})
       .libcallFor({S64})
@@ -216,16 +221,23 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_ROTR).legalFor({{S32}, {S32}});
   getActionDefinitionsBuilder({G_ROTL, G_FSHL, G_FSHR}).lower();
+    // Odd widths (e.g. s52) are widened first: narrowing only splits in halves.
   getActionDefinitionsBuilder(G_CTLZ)
       .customFor({{S32, S32}})
+      .widenScalarToNextPow2(1, 32)
       .clampScalar(1, S32, S32)
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder(G_CTLZ_ZERO_UNDEF)
       .legalFor({{S32, S32}})
+      .widenScalarToNextPow2(1, 32)
       .clampScalar(1, S32, S32)
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32);
   getActionDefinitionsBuilder({G_CTTZ, G_CTTZ_ZERO_UNDEF, G_CTPOP})
+      .widenScalarToNextPow2(1, 32)
       .clampScalar(1, S32, S32)
+      .widenScalarToNextPow2(0, 32)
       .clampScalar(0, S32, S32)
       .lower();
   getActionDefinitionsBuilder({G_BSWAP, G_BITREVERSE})
