@@ -184,8 +184,12 @@ bool ABISysV_m88k::GetArgumentValues(Thread &thread, ValueList &values) const {
     if (!value)
       return false;
     CompilerType type = value->GetCompilerType();
-    std::optional<uint64_t> size = type.GetByteSize(&thread);
-    if (!size || *size > 4)
+    llvm::Expected<uint64_t> size = type.GetByteSize(&thread);
+    if (!size) {
+      llvm::consumeError(size.takeError());
+      return false;
+    }
+    if (*size > 4)
       return false;
     bool is_signed = false;
     if (!type.IsIntegerOrEnumerationType(is_signed) && !type.IsPointerType())
@@ -217,11 +221,10 @@ Status ABISysV_m88k::SetReturnValueObject(StackFrameSP &frame_sp,
     return Status::FromErrorString("Null clang type for return value.");
 
   bool is_signed = false;
-  uint32_t count = 0;
   bool is_complex = false;
   if (!compiler_type.IsIntegerOrEnumerationType(is_signed) &&
       !compiler_type.IsPointerType() &&
-      !(compiler_type.IsFloatingPointType(count, is_complex) && !is_complex))
+      !(compiler_type.IsFloatingPointType(is_complex) && !is_complex))
     return Status::FromErrorString(
         "Returning this type is not supported on m88k.");
 
@@ -271,9 +274,11 @@ ABISysV_m88k::GetReturnValueObjectSimple(Thread &thread,
   if (!r2 || !r3)
     return ValueObjectSP();
 
-  std::optional<uint64_t> byte_size = compiler_type.GetByteSize(&thread);
-  if (!byte_size)
+  llvm::Expected<uint64_t> byte_size = compiler_type.GetByteSize(&thread);
+  if (!byte_size) {
+    llvm::consumeError(byte_size.takeError());
     return ValueObjectSP();
+  }
 
   Value value;
   value.SetCompilerType(compiler_type);
@@ -309,10 +314,8 @@ ABISysV_m88k::GetReturnValueObjectSimple(Thread &thread,
   } else if (type_flags & eTypeIsPointer) {
     value.GetScalar() = uint32_t(raw);
   } else if (type_flags & eTypeIsFloat) {
-    uint32_t count = 0;
     bool is_complex = false;
-    if (!compiler_type.IsFloatingPointType(count, is_complex) || is_complex ||
-        count != 1)
+    if (!compiler_type.IsFloatingPointType(is_complex) || is_complex)
       return ValueObjectSP();
     if (*byte_size == 4) {
       uint32_t bits = uint32_t(raw);
@@ -344,45 +347,39 @@ ABISysV_m88k::GetReturnValueObjectImpl(Thread &thread,
 
 // At the first instruction of a function the CFA is the stack pointer and the
 // return address is in r1.
-bool ABISysV_m88k::CreateFunctionEntryUnwindPlan(UnwindPlan &unwind_plan) {
-  unwind_plan.Clear();
-  unwind_plan.SetRegisterKind(eRegisterKindDWARF);
-
-  UnwindPlan::RowSP row(new UnwindPlan::Row);
-  row->GetCFAValue().SetIsRegisterPlusOffset(dwarf_r31, 0);
-  row->SetRegisterLocationToIsCFAPlusOffset(dwarf_r31, 0, true);
-  row->SetRegisterLocationToSame(dwarf_r1, false);
-  row->SetRegisterLocationToSame(dwarf_r30, false);
-  unwind_plan.AppendRow(row);
-
-  unwind_plan.SetReturnAddressRegister(dwarf_r1);
-  unwind_plan.SetSourceName("m88k at-func-entry default");
-  unwind_plan.SetSourcedFromCompiler(eLazyBoolNo);
-  unwind_plan.SetUnwindPlanValidAtAllInstructions(eLazyBoolNo);
-  unwind_plan.SetUnwindPlanForSignalTrap(eLazyBoolNo);
-  return true;
+UnwindPlanSP ABISysV_m88k::CreateFunctionEntryUnwindPlan() {
+  UnwindPlan::Row row;
+  row.GetCFAValue().SetIsRegisterPlusOffset(dwarf_r31, 0);
+  row.SetRegisterLocationToIsCFAPlusOffset(dwarf_r31, 0, true);
+  row.SetRegisterLocationToSame(dwarf_r1, false);
+  row.SetRegisterLocationToSame(dwarf_r30, false);
+  auto plan_sp = std::make_shared<UnwindPlan>(eRegisterKindDWARF);
+  plan_sp->AppendRow(std::move(row));
+  plan_sp->SetReturnAddressRegister(dwarf_r1);
+  plan_sp->SetSourceName("m88k at-func-entry default");
+  plan_sp->SetSourcedFromCompiler(eLazyBoolNo);
+  plan_sp->SetUnwindPlanValidAtAllInstructions(eLazyBoolNo);
+  plan_sp->SetUnwindPlanForSignalTrap(eLazyBoolNo);
+  return plan_sp;
 }
 
 // Frame pointer based unwinding after the prologue. The prologue stores the
 // caller's r30 at [r30] and the return address at [r30 + 4]. The distance
 // between r30 and the incoming stack pointer depends on the frame size, so
 // the CFA used here is r30 itself; the caller's stack pointer is unknown.
-bool ABISysV_m88k::CreateDefaultUnwindPlan(UnwindPlan &unwind_plan) {
-  unwind_plan.Clear();
-  unwind_plan.SetRegisterKind(eRegisterKindDWARF);
-
-  UnwindPlan::RowSP row(new UnwindPlan::Row);
-  row->GetCFAValue().SetIsRegisterPlusOffset(dwarf_r30, 0);
-  row->SetRegisterLocationToAtCFAPlusOffset(dwarf_r30, 0, true);
-  row->SetRegisterLocationToAtCFAPlusOffset(dwarf_r1, 4, true);
-  unwind_plan.AppendRow(row);
-
-  unwind_plan.SetReturnAddressRegister(dwarf_r1);
-  unwind_plan.SetSourceName("m88k default unwind plan");
-  unwind_plan.SetSourcedFromCompiler(eLazyBoolNo);
-  unwind_plan.SetUnwindPlanValidAtAllInstructions(eLazyBoolNo);
-  unwind_plan.SetUnwindPlanForSignalTrap(eLazyBoolNo);
-  return true;
+UnwindPlanSP ABISysV_m88k::CreateDefaultUnwindPlan() {
+  UnwindPlan::Row row;
+  row.GetCFAValue().SetIsRegisterPlusOffset(dwarf_r30, 0);
+  row.SetRegisterLocationToAtCFAPlusOffset(dwarf_r30, 0, true);
+  row.SetRegisterLocationToAtCFAPlusOffset(dwarf_r1, 4, true);
+  auto plan_sp = std::make_shared<UnwindPlan>(eRegisterKindDWARF);
+  plan_sp->AppendRow(std::move(row));
+  plan_sp->SetReturnAddressRegister(dwarf_r1);
+  plan_sp->SetSourceName("m88k default unwind plan");
+  plan_sp->SetSourcedFromCompiler(eLazyBoolNo);
+  plan_sp->SetUnwindPlanValidAtAllInstructions(eLazyBoolNo);
+  plan_sp->SetUnwindPlanForSignalTrap(eLazyBoolNo);
+  return plan_sp;
 }
 
 bool ABISysV_m88k::RegisterIsVolatile(const RegisterInfo *reg_info) {
