@@ -8,6 +8,7 @@
 
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "TargetInfo/M88kTargetInfo.h"
+#include "llvm/MC/MCDecoder.h"
 #include "llvm/MC/MCDecoderOps.h"
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
 #include "llvm/MC/MCInst.h"
@@ -18,6 +19,7 @@
 #include <cstdint>
 
 using namespace llvm;
+using namespace llvm::MCD;
 
 #define DEBUG_TYPE "m88k-disassembler"
 
