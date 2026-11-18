@@ -2377,6 +2377,8 @@ ExceptionHandling Triple::getDefaultExceptionHandling() const {
   case Triple::xcore:
   case Triple::xtensa:
     return ExceptionHandling::DwarfCFI;
+  case Triple::m88k:
+    return ExceptionHandling::SjLj;
   default:
     break;
   }
