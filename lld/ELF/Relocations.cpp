@@ -887,6 +887,13 @@ static void addPltEntry(Ctx &ctx, PltSection &plt, GotPltSection &gotPlt,
                         RelocationBaseSection &rel, RelType type, Symbol &sym) {
   plt.addEntry(sym);
   gotPlt.addEntry(sym);
+  // On M88k the addend of R_88K_GOTP_ENT is the address of the PLT entry,
+  // which ld.so patches to point at the GOT slot.
+  if (ctx.arg.emachine == EM_88K && sym.isPreemptible) {
+    rel.addReloc({type, &gotPlt, sym.getGotPltOffset(ctx),
+                  DynamicReloc::AgainstSymbolWithTargetVA, sym, 0, R_PLT});
+    return;
+  }
   rel.addReloc({type, &gotPlt, sym.getGotPltOffset(ctx),
                 sym.isPreemptible ? DynamicReloc::AgainstSymbol
                                   : DynamicReloc::AddendOnlyWithTargetVA,
