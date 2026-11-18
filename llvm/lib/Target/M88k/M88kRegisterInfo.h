@@ -47,8 +47,7 @@ struct M88kRegisterInfo : public M88kGenRegisterInfo {
                                        CallingConv::ID CC) const override;
 
   const TargetRegisterClass *
-  getPointerRegClass(const MachineFunction &MF,
-                     unsigned Kind = 0) const override;
+  getPointerRegClass(unsigned Kind = 0) const override;
 
 #if 0
   const uint32_t* getRTCallPreservedMask(CallingConv::ID CC) const;

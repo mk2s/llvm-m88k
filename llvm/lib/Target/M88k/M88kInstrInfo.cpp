@@ -57,7 +57,7 @@ using namespace llvm;
 void M88kInstrInfo::anchor() {}
 
 M88kInstrInfo::M88kInstrInfo(const M88kSubtarget &STI)
-    : M88kGenInstrInfo(-1, -1), STI(STI), RI() {}
+    : M88kGenInstrInfo(STI, RI, -1, -1), STI(STI), RI() {}
 
 std::pair<unsigned, unsigned>
 M88kInstrInfo::decomposeMachineOperandsTargetFlags(unsigned TF) const {
@@ -451,14 +451,13 @@ Register M88kInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
 void M88kInstrInfo::storeRegToStackSlot(
     MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI, Register SrcReg,
     bool IsKill, int FrameIndex, const TargetRegisterClass *RC,
-    const TargetRegisterInfo *TRI, Register VReg,
-    MachineInstr::MIFlag Flags) const {
+    Register VReg, MachineInstr::MIFlag Flags) const {
   DebugLoc DL;
   MachineMemOperand *MMO =
       getMachineMemOperand(MBB, FrameIndex, MachineMemOperand::MOStore);
 
   unsigned Opc = 0;
-  switch (TRI->getSpillSize(*RC)) {
+  switch (RI.getSpillSize(*RC)) {
   case 4:
     if (M88k::GPRRegClass.hasSubClassEq(RC))
       Opc = M88k::STriw;
@@ -491,7 +490,6 @@ void M88kInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
                                          MachineBasicBlock::iterator MBBI,
                                          Register DestReg, int FrameIndex,
                                          const TargetRegisterClass *RC,
-                                         const TargetRegisterInfo *TRI,
                                          Register VReg,
                                          MachineInstr::MIFlag Flags) const {
   DebugLoc DL;
@@ -499,7 +497,7 @@ void M88kInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
       getMachineMemOperand(MBB, FrameIndex, MachineMemOperand::MOLoad);
 
   unsigned Opc = 0;
-  switch (TRI->getSpillSize(*RC)) {
+  switch (RI.getSpillSize(*RC)) {
   case 4:
     if (M88k::GPRRegClass.hasSubClassEq(RC))
       Opc = M88k::LDriw;
@@ -539,8 +537,8 @@ unsigned M88kInstrInfo::getInstSizeInBytes(const MachineInstr &MI) const {
 
 void M88kInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator MBBI,
-                                const DebugLoc &DL, MCRegister DestReg,
-                                MCRegister SrcReg, bool KillSrc,
+                                const DebugLoc &DL, Register DestReg,
+                                Register SrcReg, bool KillSrc,
                                 bool RenamableDest, bool RenamableSrc) const {
   // Split 64-bit GPR moves into two 64-bit moves. Add implicit uses of the
   // super register in case one of the subregs is undefined.
@@ -663,7 +661,7 @@ bool M88kInstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
   return true;
 }
 
-bool M88kInstrInfo::isReallyTriviallyReMaterializable(
+bool M88kInstrInfo::isReMaterializableImpl(
     const MachineInstr &MI) const {
   switch (MI.getOpcode()) {
   default:
@@ -694,9 +692,8 @@ bool M88kInstrInfo::isReallyTriviallyReMaterializable(
 void M88kInstrInfo::reMaterialize(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator I,
                                   Register DestReg, unsigned SubIdx,
-                                  const MachineInstr &Orig,
-                                  const TargetRegisterInfo &TRI) const {
+                                  const MachineInstr &Orig) const {
   MachineInstr *MI = MBB.getParent()->CloneMachineInstr(&Orig);
   MBB.insert(I, MI);
-  MI->substituteRegister(Orig.getOperand(0).getReg(), DestReg, SubIdx, TRI);
+  MI->substituteRegister(Orig.getOperand(0).getReg(), DestReg, SubIdx, RI);
 }

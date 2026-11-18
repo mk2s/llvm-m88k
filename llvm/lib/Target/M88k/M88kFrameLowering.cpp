@@ -207,7 +207,7 @@ bool M88kFrameLowering::spillCalleeSavedRegisters(
     // Save in the normal TargetInstrInfo way.
     const TargetRegisterClass *RC = TRI->getMinimalPhysRegClass(Reg);
     TII->storeRegToStackSlot(MBB, MBBI, Reg, /*isKill=*/!IsRAAndRetAddrIsTaken,
-                             CS.getFrameIdx(), RC, TRI, Register());
+                             CS.getFrameIdx(), RC, Register());
 
     // Mark the store with the FrameSetup flag.
     std::prev(MBBI)->setFlag(MachineInstr::FrameSetup);
@@ -227,8 +227,7 @@ bool M88kFrameLowering::restoreCalleeSavedRegisters(
   for (auto &CS : llvm::reverse(CSI)) {
     Register Reg = CS.getReg();
     const TargetRegisterClass *RC = TRI->getMinimalPhysRegClass(Reg);
-    TII->loadRegFromStackSlot(MBB, MBBI, Reg, CS.getFrameIdx(), RC, TRI,
-                              Register());
+    TII->loadRegFromStackSlot(MBB, MBBI, Reg, CS.getFrameIdx(), RC, Register());
     std::prev(MBBI)->setFlag(MachineInstr::FrameDestroy);
   }
   return true;
