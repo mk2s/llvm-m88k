@@ -117,7 +117,10 @@ void openbsd::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   const bool Shared = Args.hasArg(options::OPT_shared);
   const bool Profiling = Args.hasArg(options::OPT_pg);
   const bool Pie = Args.hasArg(options::OPT_pie);
-  const bool Nopie = Args.hasArg(options::OPT_no_pie, options::OPT_nopie);
+  // Targets that are not PIE by default (m88k) link like -nopie: crt0.o
+  // instead of rcrt0.o for -static.
+  const bool Nopie = Args.hasArg(options::OPT_no_pie, options::OPT_nopie) ||
+                     (!Pie && !ToolChain.isPIEDefault(Args));
   const bool Relocatable = Args.hasArg(options::OPT_r);
   ArgStringList CmdArgs;
 
