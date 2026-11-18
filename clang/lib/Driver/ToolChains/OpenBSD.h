@@ -60,7 +60,9 @@ public:
   bool IsMathErrnoDefault() const override { return false; }
   bool IsObjCNonFragileABIDefault() const override { return true; }
   bool isPIEDefault(const llvm::opt::ArgList &Args) const override {
-    return true;
+    // OpenBSD does not build position independent executables by default on
+    // m88k (its cc produces ET_EXEC binaries).
+    return getArch() != llvm::Triple::m88k;
   }
 
   RuntimeLibType GetDefaultRuntimeLibType() const override {
