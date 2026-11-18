@@ -47,9 +47,10 @@ ABIArgInfo M88kABIInfo::classifyArgumentType(QualType Ty) const {
     // Records with non-trivial destructors/copy-constructors should not be
     // passed by value.
     if (CGCXXABI::RecordArgABI RAA = getRecordArgABI(Ty, getCXXABI()))
-      return getNaturalAlignIndirect(Ty, RAA == CGCXXABI::RAA_DirectInMemory);
+      return getNaturalAlignIndirect(Ty, getDataLayout().getAllocaAddrSpace(),
+                                     RAA == CGCXXABI::RAA_DirectInMemory);
 
-    return getNaturalAlignIndirect(Ty);
+    return getNaturalAlignIndirect(Ty, getDataLayout().getAllocaAddrSpace());
   }
 
   // Treat an enum type as its underlying type.
@@ -62,7 +63,7 @@ ABIArgInfo M88kABIInfo::classifyArgumentType(QualType Ty) const {
         Context.getTypeSize(Context.getTargetInfo().hasInt128Type()
                                 ? Context.Int128Ty
                                 : Context.LongLongTy))
-      return getNaturalAlignIndirect(Ty);
+      return getNaturalAlignIndirect(Ty, getDataLayout().getAllocaAddrSpace());
 
   return (isPromotableIntegerTypeForABI(Ty) ? ABIArgInfo::getExtend(Ty)
                                             : ABIArgInfo::getDirect());
@@ -73,7 +74,7 @@ ABIArgInfo M88kABIInfo::classifyReturnType(QualType RetTy) const {
     return ABIArgInfo::getIgnore();
 
   if (isAggregateTypeForABI(RetTy))
-    return getNaturalAlignIndirect(RetTy);
+    return getNaturalAlignIndirect(RetTy, getDataLayout().getAllocaAddrSpace());
 
   // Treat an enum type as its underlying type.
   if (const EnumType *EnumTy = RetTy->getAs<EnumType>())
@@ -84,7 +85,7 @@ ABIArgInfo M88kABIInfo::classifyReturnType(QualType RetTy) const {
         getContext().getTypeSize(getContext().getTargetInfo().hasInt128Type()
                                      ? getContext().Int128Ty
                                      : getContext().LongLongTy))
-      return getNaturalAlignIndirect(RetTy);
+      return getNaturalAlignIndirect(RetTy, getDataLayout().getAllocaAddrSpace());
 
   return (isPromotableIntegerTypeForABI(RetTy) ? ABIArgInfo::getExtend(RetTy)
                                                : ABIArgInfo::getDirect());
