@@ -15,10 +15,10 @@
 namespace llvm {
 
 bool CC_M88k(unsigned ValNo, MVT ValVT, MVT LocVT, CCValAssign::LocInfo LocInfo,
-             ISD::ArgFlagsTy ArgFlags, CCState &State);
+             ISD::ArgFlagsTy ArgFlags, Type *OrigTy, CCState &State);
 bool RetCC_M88k(unsigned ValNo, MVT ValVT, MVT LocVT,
                 CCValAssign::LocInfo LocInfo, ISD::ArgFlagsTy ArgFlags,
-                CCState &State);
+                Type *OrigTy, CCState &State);
 
 } // end namespace llvm
 

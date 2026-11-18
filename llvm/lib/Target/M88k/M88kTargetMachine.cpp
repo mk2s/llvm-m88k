@@ -87,7 +87,8 @@ std::string computeDataLayout(const Triple &TT, StringRef CPU, StringRef FS) {
   Ret += "E";
 
   // Data mangling.
-  Ret += DataLayout::getManglingComponent(TT);
+  // ELF mangling (DataLayout::getManglingComponent was removed upstream).
+  Ret += "-m:e";
 
   // Pointers are 32 bit.
   Ret += "-p:32:32:32";
