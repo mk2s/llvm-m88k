@@ -605,6 +605,11 @@ std::string Triple::computeDataLayout(StringRef ABIName) const {
   case Triple::x86:
   case Triple::x86_64:
     return computeX86DataLayout(*this);
+  case Triple::m88k:
+    // Keep in sync with M88kTargetMachine.cpp and
+    // clang/lib/Basic/Targets/M88k.cpp.
+    return "E-m:e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-"
+           "f32:32:32-f64:64:64-a:8:16-n32";
   case Triple::xcore:
     return "e-m:e-p:32:32-i1:8:32-i8:8:32-i16:16:32-i64:32-f64:32-a:0:32-n32";
   case Triple::xtensa:

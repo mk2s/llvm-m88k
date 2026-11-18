@@ -40,6 +40,12 @@ public:
                            const llvm::opt::ArgList &Args);
   bool hasValidGCCInstallation() const { return IsGCCInstallationValid; }
   bool isBareMetal() const override { return true; }
+  // Upstream bare-metal uses the system ld; there is no GNU ld for m88k.
+  const char *getDefaultLinker() const override {
+    return getTriple().getArch() == llvm::Triple::m88k
+               ? "ld.lld"
+               : Generic_ELF::getDefaultLinker();
+  }
   bool isCrossCompiling() const override { return true; }
   bool HasNativeLLVMSupport() const override { return true; }
   bool isPICDefault() const override { return false; }
