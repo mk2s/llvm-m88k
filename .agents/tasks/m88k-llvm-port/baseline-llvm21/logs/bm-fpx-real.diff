@@ -1,0 +1,6 @@
+11,12c11,12
+< inf-inf class 3ff0000000000000
+< nan cmp eq=0 ne=1 lt=0 gt=1 le=0 ge=1 self=1
+---
+> inf-inf class 0000000000000000
+> nan cmp eq=0 ne=1 lt=0 gt=0 le=0 ge=0 self=0

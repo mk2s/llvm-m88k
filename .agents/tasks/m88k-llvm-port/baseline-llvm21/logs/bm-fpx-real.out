@@ -1,0 +1,17 @@
+denorm add 0000000000000003
+denorm mul 0000000000000004
+denorm half 0008000000000000
+denorm sub 000fffffffffffff
+one plus denorm 3ff0000000000000
+sdenorm add 00022d84
+sdenorm one 3f800000
+1/0 7ff0000000000000
+-1/0 fff0000000000000
+inf*2 7ff0000000000000
+inf-inf class 3ff0000000000000
+nan cmp eq=0 ne=1 lt=0 gt=1 le=0 ge=1 self=1
+inf cmp gt=1 eq=1 lt=1
+int 1500000000 -1500000000
+denorm cmp lt=1 eq=1
+printf 3.750 42
+FPX REAL DONE
