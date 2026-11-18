@@ -118,3 +118,7 @@ Conflicts and resolutions: (none yet)
 Test expectation changes: (none yet)
 
 Lessons for the next port: (none yet)
+
+## Status notes
+
+- codeberg push pending: needs user auth (repo exists but is empty; HTTPS push hangs on the credential-manager GUI prompt). github has all four branches and pre-llvm22/* tags.
