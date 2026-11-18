@@ -121,3 +121,9 @@ implements the mc88100 FP instructions with softfloat but does not model FP exce
 operands, so it is more permissive than real silicon (see the SFU1 section above).
 Real hardware: back up `~/Documents/mame/tftpboot/0A000207`, `cp out/val.coff` over it, power-cycle,
 watch the screen (and AUX port, 9600 8N1).
+## Zig (via the C backend)
+    ./build-zig.sh hello         # zig/hello.zig -> out/zig-hello.elf, out/zig-hello.coff
+    ./run-ncd19c.py out/zig-hello.coff --mode inject --expect "zig ok"
+Zig has no m88k target, so `zig build-obj -ofmt=c` runs for a stand-in target (`ZIG_STAND_IN_TARGET`,
+default `mips-freestanding`: 32-bit big-endian, 8-byte long double) and the m88k clang compiles the C
+with Zig's `zig.h`. Only integer code is tested. The .zig file exports `zig_main`; `zig/main.c` calls it.
