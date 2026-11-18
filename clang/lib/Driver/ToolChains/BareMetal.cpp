@@ -630,7 +630,10 @@ void baremetal::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("text");
   }
 
-  if (const char *LDMOption = getLDMOption(TC.getTriple(), Args)) {
+  // lld picks the m88k emulation from the input objects; there is no -m name.
+  if (Triple.getArch() == llvm::Triple::m88k) {
+    // No -m option.
+  } else if (const char *LDMOption = getLDMOption(TC.getTriple(), Args)) {
     CmdArgs.push_back("-m");
     CmdArgs.push_back(LDMOption);
   } else {
