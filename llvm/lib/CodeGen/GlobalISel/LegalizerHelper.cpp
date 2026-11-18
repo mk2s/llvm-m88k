@@ -4181,9 +4181,9 @@ LegalizerHelper::LegalizeResult LegalizerHelper::lowerLoad(GAnyLoad &LoadMI) {
     return Legalized;
   }
 
-  // Big endian lowering not implemented.
-  if (MIRBuilder.getDataLayout().isBigEndian())
-    return UnableToLegalize;
+  // The larger part is at the lower address. On a little-endian target it
+  // holds the low bits, on a big-endian target the high bits.
+  const bool IsBigEndian = MIRBuilder.getDataLayout().isBigEndian();
 
   // This load needs splitting into power of 2 sized loads.
   //
@@ -4251,27 +4251,34 @@ LegalizerHelper::LegalizeResult LegalizerHelper::lowerLoad(GAnyLoad &LoadMI) {
   LLT PtrTy = MRI.getType(PtrReg);
   unsigned AnyExtSize = PowerOf2Ceil(DstTy.getSizeInBits());
   LLT AnyExtTy = LLT::scalar(AnyExtSize);
-  auto LargeLoad = MIRBuilder.buildLoadInstr(TargetOpcode::G_ZEXTLOAD, AnyExtTy,
-                                             PtrReg, *LargeMMO);
+    // The part holding the high bits keeps the extension kind of the original
+  // load, the part holding the low bits is zero extended.
+  auto LargeLoad = MIRBuilder.buildLoadInstr(
+      IsBigEndian ? LoadMI.getOpcode() : TargetOpcode::G_ZEXTLOAD, AnyExtTy,
+      PtrReg, *LargeMMO);
 
   auto OffsetCst = MIRBuilder.buildConstant(LLT::scalar(PtrTy.getSizeInBits()),
                                             LargeSplitSize / 8);
   Register PtrAddReg = MRI.createGenericVirtualRegister(PtrTy);
   auto SmallPtr = MIRBuilder.buildObjectPtrOffset(PtrAddReg, PtrReg, OffsetCst);
-  auto SmallLoad = MIRBuilder.buildLoadInstr(LoadMI.getOpcode(), AnyExtTy,
-                                             SmallPtr, *SmallMMO);
+    auto SmallLoad = MIRBuilder.buildLoadInstr(
+      IsBigEndian ? TargetOpcode::G_ZEXTLOAD : LoadMI.getOpcode(), AnyExtTy,
+      SmallPtr, *SmallMMO);
+  Register HighPart = IsBigEndian ? LargeLoad.getReg(0) : SmallLoad.getReg(0);
+  Register LowPart = IsBigEndian ? SmallLoad.getReg(0) : LargeLoad.getReg(0);
 
-  auto ShiftAmt = MIRBuilder.buildConstant(AnyExtTy, LargeSplitSize);
-  auto Shift = MIRBuilder.buildShl(AnyExtTy, SmallLoad, ShiftAmt);
+    auto ShiftAmt = MIRBuilder.buildConstant(
+      AnyExtTy, IsBigEndian ? SmallSplitSize : LargeSplitSize);
+  auto Shift = MIRBuilder.buildShl(AnyExtTy, HighPart, ShiftAmt);
 
   if (AnyExtTy == DstTy)
-    MIRBuilder.buildOr(DstReg, Shift, LargeLoad);
+    MIRBuilder.buildOr(DstReg, Shift, LowPart);
   else if (AnyExtTy.getSizeInBits() != DstTy.getSizeInBits()) {
-    auto Or = MIRBuilder.buildOr(AnyExtTy, Shift, LargeLoad);
+    auto Or = MIRBuilder.buildOr(AnyExtTy, Shift, LowPart);
     MIRBuilder.buildTrunc(DstReg, {Or});
   } else {
     assert(DstTy.isPointer() && "expected pointer");
-    auto Or = MIRBuilder.buildOr(AnyExtTy, Shift, LargeLoad);
+    auto Or = MIRBuilder.buildOr(AnyExtTy, Shift, LowPart);
 
     // FIXME: We currently consider this to be illegal for non-integral address
     // spaces, but we need still need a way to reinterpret the bits.
@@ -4354,11 +4361,18 @@ LegalizerHelper::LegalizeResult LegalizerHelper::lowerStore(GStore &StoreMI) {
     SrcReg = MIRBuilder.buildPtrToInt(IntPtrTy, SrcReg).getReg(0);
   }
 
-  auto ExtVal = MIRBuilder.buildAnyExtOrTrunc(NewSrcTy, SrcReg);
-
-  // Obtain the smaller value by shifting away the larger value.
-  auto ShiftAmt = MIRBuilder.buildConstant(NewSrcTy, LargeSplitSize);
-  auto SmallVal = MIRBuilder.buildLShr(NewSrcTy, ExtVal, ShiftAmt);
+    auto ExtVal = MIRBuilder.buildAnyExtOrTrunc(NewSrcTy, SrcReg);
+  // The larger part is stored at the lower address. On a little-endian target
+  // it holds the low bits and the smaller value is obtained by shifting away
+  // the larger value; on a big-endian target it holds the high bits.
+  Register LargeVal = ExtVal.getReg(0), SmallVal = ExtVal.getReg(0);
+  if (MIRBuilder.getDataLayout().isBigEndian()) {
+    auto ShiftAmt = MIRBuilder.buildConstant(NewSrcTy, SmallSplitSize);
+    LargeVal = MIRBuilder.buildLShr(NewSrcTy, ExtVal, ShiftAmt).getReg(0);
+  } else {
+    auto ShiftAmt = MIRBuilder.buildConstant(NewSrcTy, LargeSplitSize);
+    SmallVal = MIRBuilder.buildLShr(NewSrcTy, ExtVal, ShiftAmt).getReg(0);
+  }
 
   // Generate the PtrAdd and truncating stores.
   LLT PtrTy = MRI.getType(PtrReg);
@@ -4370,7 +4384,7 @@ LegalizerHelper::LegalizeResult LegalizerHelper::lowerStore(GStore &StoreMI) {
     MF.getMachineMemOperand(&MMO, 0, LargeSplitSize / 8);
   MachineMemOperand *SmallMMO =
     MF.getMachineMemOperand(&MMO, LargeSplitSize / 8, SmallSplitSize / 8);
-  MIRBuilder.buildStore(ExtVal, PtrReg, *LargeMMO);
+    MIRBuilder.buildStore(LargeVal, PtrReg, *LargeMMO);
   MIRBuilder.buildStore(SmallVal, SmallPtr, *SmallMMO);
   StoreMI.eraseFromParent();
   return Legalized;
