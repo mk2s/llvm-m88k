@@ -55,6 +55,7 @@ M88kTargetLowering::M88kTargetLowering(const TargetMachine &TM,
 
 bool M88kTargetLowering::isCheapToSpeculateCtlz(Type *Ty) const { return true; }
 
+bool M88kTargetLowering::isCheapToSpeculateCttz(Type *Ty) const { return true; }
 bool M88kTargetLowering::isCtlzFast() const { return true; }
 
 bool M88kTargetLowering::isSelectSupported(SelectSupportKind /*kind*/) const {

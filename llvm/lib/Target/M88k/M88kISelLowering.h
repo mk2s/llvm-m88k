@@ -52,6 +52,7 @@ public:
   bool isIndexingLegal(MachineInstr &MI, Register Base, Register Offset,
                        bool IsPre, MachineRegisterInfo &MRI) const override;
   bool isCheapToSpeculateCtlz(Type *Ty) const override;
+  bool isCheapToSpeculateCttz(Type *Ty) const override;
   bool isCtlzFast() const override;
   Register getRegisterByName(const char *RegName, LLT Ty,
                              const MachineFunction &MF) const override;
