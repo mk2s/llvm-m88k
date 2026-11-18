@@ -97,10 +97,11 @@ approximates the real replay: a clean forecast does not guarantee a clean `rebas
 
 ## Untested parts
 
-Nothing past the dry-run checks has been run. As of this file's creation:
+Updated after the 22.1 port. Earlier state:
 
 - Tested by hand: `m88k-baseline.sh --only lit` on the LLVM 21-based build (101 results, all PASS), `m88k-baseline-diff.sh` on sample files, `bash -n` on both scripts, JSON validity of the recipe.
-- Untested: compiler-rt reconfiguration when the resource dir changes (the `lldb`, `rt` build/install and `baremetal` steps ran on 2026-11-18, see the baseline section); the whole recipe in the workflow engine (parameter substitution, `fileCheck` stop conditions, `captureOutput`); worktree and per-segment replay; the build-fix loop; verify, triage and report steps; the baremetal expectation that `fpx-real` differs from `.expected` in two known NaN lines (it will show as FAIL in the baseline, which is correct, because only differences are reported).
+- Exercised by the 22.1 port (2026-11-18): worktree and per-segment replay, the build-fix loop, verify, triage and report steps, compiler-rt builtins rt build/install, baseline diff on the new build.
+- Still untested: the `lldb` M88k behaviour beyond start-up (no lit tests); a dry run of the recipe; reuse of the recipe for another release (planned for Zig 0.18).
 - Not available here: `shellcheck`.
 - Known gap: `lldb` has no lit tests for M88k. The lldb step only checks that the binary starts and lists the M88k ABI plugin.
 
@@ -111,20 +112,52 @@ Remove an item from this list only when a run exercised it.
 One section per release, added by the `report` step. Each row: commit, files, upstream API change, upstream commit.
 Read the earlier sections before starting a port: the same breakage often returns in a different form.
 
-### LLVM 22.1 (llvmorg-22.1.8)
-
-Seeded, not yet run. Starting point: stack forked from upstream `4590f755cf58` (6 Feb 2025, LLVM 21 development),
-about 21,000 upstream commits behind the tag; the stack has 397 commits (`main-m88k` 369, +2, +2, +24; counts from `git rev-list --count`).
+### LLVM 22 (llvmorg-22.1.8, 2026-11-18)
+Stack: 404 commits on llvmorg-22.1.8 (369+2+2+31), branch release/22.x-m88k. Build-fix loop took 7 iterations; test diff vs LLVM 21 baseline: 0 new failures, 0 missing (119 results, fpx-real still the known FAIL).
 
 | Commit | Files | Upstream API change | Upstream commit |
 |---|---|---|---|
-| (none yet) | | | |
+| a92d633e61c8 | llvm/utils/TableGen/GlobalISelBURGEmitter.cpp | CodeGenTarget::getInstructionsByEnumValue() removed, use getInstructions() | (api removal, ordering now inherent) |
+| 4a641a1e604c | BURSInstructionSelector.h, BURSInstructionSelect.cpp, M88k GISel/*.cpp, M88kCombine.td | GISelKnownBits -> GISelValueTracking (+AnalysisLegacy, getValueTracking, KB->VT) | 1d0005a69ac8 |
+| b9de61a85b41 | clang/lib/AST/ASTContext.cpp | ASTContext::getRecordType -> getCanonicalTagType | 91cdd35008e9 |
+| 10d50696d2e0 | clang/lib/Basic/Targets/M88k.cpp | ArrayRef(std::nullopt) removed, return {} | (ArrayRef cleanup) |
+| 3bcc7af1434c | llvm/lib/CodeGen/GlobalISel/BURSInstructionSelect.cpp | reportGISelFailure no longer takes TPC | (GlobalISel Utils change) |
+| d48c5e62d5fb | llvm/lib/Target/M88k/M88k.td | defm RemapAllTargetPseudoPointerOperands<GPR> mandatory | 7bf459bce342 |
+| d444fef8c205 | clang/lib/Driver/ToolChains/Arch/M88k.cpp | CommonArgs.h now clang/Driver/CommonArgs.h | (header move) |
+| 42bd229d9086 | clang/lib/CodeGen/Targets/M88k.cpp | getNaturalAlignIndirect requires AddrSpace | 39ec9de7c230 |
+| 0e5de518e4a4 | clang/lib/Driver/ToolChains/Arch/M88k.cpp | clang/Driver/Options.h -> clang/Options/Options.h | 9a783b63e647 |
+| 1e8440030f6b | M88kInstrInfo.{h,cpp}, M88kRegisterInfo.{h,cpp}, M88kFrameLowering.cpp | TII/TRI hook signatures, GenInstrInfo ctor | 2331fbb01978, 1f3f522866ae, 8b7a76a2ace3 |
+| a84435db5a70 | M88kCallingConv.h, M88kISelLowering.cpp, M88kTargetMachine.cpp | CCAssignFn OrigTy; TargetLowering(TM,STI); DataLayout::getManglingComponent removed | e92b7e964194, f3efbce4a73c |
+| 117d7785d06d | M88kAsmParser.cpp, M88kDisassembler.cpp | MCAsmLexer->AsmLexer; MCD namespace for decoder tables | c9f6d26e0498, 7b6db769c347 |
+| f3b8734d1149 | M88kInstrInfo.{h,cpp}, AsmParser/M88kAsmParser.cpp | loadRegFromStackSlot SubReg; MCParsedAsmOperand::print(OS,MAI); MCAsmInfo::useCodeAlign | 9e1606026c56, e9de1ee9f57c |
+| 8581a7f723ef | M88k MCTargetDesc/*, AsmParser, M88kMCInstLower.cpp (M88kMCExpr.{h,cpp} removed) | MCTargetExpr->MCSpecifierExpr; applyFixup/maybeAddReloc replaces shouldForceRelocation; MCFixupKindInfo.h merged; MCFixup::create no SMLoc; getRelocType sig | 38658b54b244, dd2891535d4b, cd39eaeb376e, d5893fc2a7e1 |
 
-Conflicts and resolutions: (none yet)
+Conflict patterns and resolutions:
+- Triple.h/Triple.cpp: upstream reformats the enum and StringSwitch tables, so each m88k commit touching them conflicts as a block. Take upstream's block, re-add the m88k lines.
+- New per-target clang builtin code goes to clang/lib/CodeGen/TargetBuiltins/<Target>.cpp, not CGBuiltin.cpp.
+- LLVM_HAS_<T>_TARGET lives in llvm/include/llvm/Config/Targets.h.cmake (upstream 667209e45122).
+- New declarations in public LLVM headers (InitializePasses.h) need LLVM_ABI.
+- lld DynamicReloc::Kind removed: `AgainstSymbolWithTargetVA, X` -> `true, X`; `AgainstSymbol` -> `true, R_ADDEND`; `AddendOnlyWithTargetVA, X` -> `false, X`.
+- GlobalISel InlineAsmLowering now handles non-indirect memory inputs; the m88k hunk was redundant.
+- Clang driver include lists, compiler-rt arch lists and lldb ArchSpec/ABI CMake tables move often: take upstream, re-add M88k.
+- Process: after a scripted conflict resolution check `grep -c '^<<<<<<<'` before `git add` (rerere.autoupdate is on; a failed script once committed markers).
 
-Test expectation changes: (none yet)
+Upstream API changes likely to recur: GISel (KnownBits -> ValueTracking, TPC args, buildObjectPtrOffset), MC (MCSpecifierExpr, fixup/reloc hooks, MCAsmLexer), TargetLowering/InstrInfo/RegisterInfo hook signatures, RuntimeLibcalls and DataLayout moving into tablegen/Triple-keyed code (m88k must be listed in each), clang Options.h/CommonArgs.h header moves, lldb ABI plugin return types.
 
-Lessons for the next port: (none yet)
+Test expectation changes:
+- MC/M88k/gnu-syntax.s: CHECK is now `65535&(foo-.Ltmp0-4)` (upstream 04a67528d303 prints fewer parentheses). No other test changed.
+
+Fixes beyond API renames (each a separate commit):
+- (A) MC/M88k/gnu-syntax.s: CHECK text now `65535&(foo-.Ltmp0-4)`; upstream 04a67528d303 prints fewer parentheses. Encodings unchanged.
+- (B) Triple::getDefaultExceptionHandling had no m88k case (SjLj); upstream 1121034dd1c4 asserts MCAsmInfo matches Triple.
+- (B) RuntimeLibcalls.td: m88k added to isDefaultLibcallArch (libcalls moved to tablegen, upstream b2f0ffd659e7).
+- (B) TargetDataLayout.cpp computeDataLayout needs an m88k case (same string as M88kTargetMachine and clang).
+- (B) clang BareMetal now derives Generic_ELF and defaults to system ld; m88k keeps ld.lld via getDefaultLinker and gets no -m option.
+- (B) M88kTargetLowering::isCheapToSpeculateCttz = true; upstream becd418626e1 changed bitcount-odd/bitcount64 codegen, now byte-identical to LLVM 21.
+- (B) lldb ABISysV_m88k: UnwindPlanSP return types, Expected GetByteSize, IsFloatingPointType(is_complex).
+- (process) scripts/m88k-baseline.sh: `cmake --install --component builtins` is a silent no-op in 22; use plain `cmake --install`. LLDB for the port builds in <work_dir>/build-lldb (X86 plus experimental M88k, no python/libedit/curses).
+
+Next port should: run the baseline on the new tag first and grep for m88k in Triple.cpp, RuntimeLibcalls.td, TargetDataLayout.cpp and BareMetal for new per-arch switches; expect the lldb build in <work_dir>/build-lldb; keep the cttz-style codegen diffs byte-identical via target hooks rather than editing expectations.
 
 ## Status notes
 
