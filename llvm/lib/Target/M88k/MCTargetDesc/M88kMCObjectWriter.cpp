@@ -27,6 +27,13 @@ public:
   M88kObjectWriter(uint8_t OSABI);
   ~M88kObjectWriter() override = default;
 
+  // A GOT relocation selects the GOT entry of its symbol, so it must not be
+  // rewritten to a section symbol plus offset (that would pick the entry of
+  // the section and add the offset to the GOT offset).
+  bool needsRelocateWithSymbol(const MCValue &, unsigned Type) const override {
+    return Type == ELF::R_88K_GOT_16H || Type == ELF::R_88K_GOT_16L;
+  }
+
 protected:
   // Override MCELFObjectTargetWriter.
   unsigned getRelocType(const MCFixup &Fixup, const MCValue &Target,

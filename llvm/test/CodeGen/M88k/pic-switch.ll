@@ -21,7 +21,7 @@
 ; STATIC:   .LJTI0_0:
 ; STATIC-NOT: %got
 ; OBJ: .data.rel.ro {{.*}} WA
-; OBJ: R_88K_GOT_16L {{.*}} .data.rel.ro + 0
+; OBJ: R_88K_GOT_16L {{.*}} .LJTI0_0 + 0
 ; OBJ: Relocation section '.rela.data.rel.ro'
 ; OBJ-COUNT-6: R_88K_32 {{.*}} .text
 define i32 @sw(i32 %x) {
