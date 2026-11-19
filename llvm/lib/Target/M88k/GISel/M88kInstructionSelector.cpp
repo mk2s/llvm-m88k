@@ -1342,6 +1342,23 @@ bool M88kInstructionSelector::preISelLower(MachineInstr &I) {
   MachineFunction &MF = *MBB.getParent();
   MachineRegisterInfo &MRI = MF.getRegInfo();
 
+  // Aligned loads and stores of up to 32 bits are single-copy atomic on the
+  // 88k, so an atomic one is selected like a plain access. The imported
+  // patterns only match non-atomic memory operands.
+  if ((I.getOpcode() == TargetOpcode::G_LOAD ||
+       I.getOpcode() == TargetOpcode::G_STORE) &&
+      I.hasOneMemOperand()) {
+    const MachineMemOperand *MMO = *I.memoperands_begin();
+    if (MMO->isAtomic() && MMO->getSize().hasValue() &&
+        MMO->getSize().getValue() <= 4 &&
+        MMO->getAlign().value() >= MMO->getSize().getValue()) {
+      MachineMemOperand *NewMMO = MF.getMachineMemOperand(
+          MMO->getPointerInfo(), MMO->getFlags(), MMO->getMemoryType(),
+          MMO->getAlign(), MMO->getAAInfo(), MMO->getRanges());
+      I.setMemRefs(MF, {NewMMO});
+    }
+  }
+
   switch (I.getOpcode()) {
   case TargetOpcode::G_STORE: {
     bool Changed = false;
