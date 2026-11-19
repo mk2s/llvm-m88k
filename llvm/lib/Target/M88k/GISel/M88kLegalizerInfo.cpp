@@ -109,6 +109,14 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
       .legalForTypesWithMemDesc({{S32, P0, S8, 8}, {S32, P0, S16, 16}})
       .customIf(typePairAndMemDescInSet(/*TypeIdx0*/ 0, /*TypeIdx1*/ 1,
                                         /*MMOIdx*/ 0, {{S32, P0, S16, 8}}))
+      // An extending load of a memory type wider than 32 bit (e.g. a 64 bit
+      // load zero-extended to s128) can't be narrowed. Split it into a load
+      // and an extend, see legalizeCustom.
+      .customIf([=](const LegalityQuery &Query) {
+        return Query.MMODescrs[0].MemoryTy.getSizeInBits() > 32 &&
+               Query.MMODescrs[0].MemoryTy.getSizeInBits() <
+                   Query.Types[0].getSizeInBits();
+      })
       .clampScalar(0, S32, S32)
       .lower();
   getActionDefinitionsBuilder({G_LOAD, G_STORE})
@@ -251,6 +259,7 @@ M88kLegalizerInfo::M88kLegalizerInfo(const M88kSubtarget &ST) {
   getActionDefinitionsBuilder({G_SMAX, G_UMAX, G_SMIN, G_UMIN}).lower();
 
   getActionDefinitionsBuilder({G_MEMCPY, G_MEMMOVE, G_MEMSET}).libcall();
+  getActionDefinitionsBuilder(G_MEMCPY_INLINE).lower();
 
   getActionDefinitionsBuilder(G_ICMP)
       .legalForCartesianProduct({S1}, {S32, P0})
@@ -374,6 +383,19 @@ bool M88kLegalizerInfo::legalizeCustom(
     GLoadStore *LdStMI = llvm::cast<GLoadStore>(&MI);
     MachineMemOperand *MMO = *LdStMI->memoperands_begin();
     MachineFunction &MF = MIRBuilder.getMF();
+    if (MI.getOpcode() != G_LOAD &&
+        MMO->getMemoryType().getSizeInBits() > 32) {
+      MIRBuilder.setInstrAndDebugLoc(MI);
+      Register Ptr = LdStMI->getPointerReg();
+      auto Load = MIRBuilder.buildLoad(
+          LLT::scalar(MMO->getMemoryType().getSizeInBits()), Ptr, *MMO);
+      if (MI.getOpcode() == G_SEXTLOAD)
+        MIRBuilder.buildSExt(MI.getOperand(0), Load);
+      else
+        MIRBuilder.buildZExt(MI.getOperand(0), Load);
+      MI.eraseFromParent();
+      return true;
+    }
 
     // Calculate the number of parts which must be loaded.
     // E.g. MemSize = 4, Align = 2 => 2 parts of size 2.
@@ -701,6 +723,34 @@ bool M88kLegalizerInfo::legalizeIntrinsic(LegalizerHelper &Helper,
                                             Align(4));
       auto Val = MIRBuilder.buildLoad(S32, SrcPtr, *LdMMO);
       MIRBuilder.buildStore(Val, DstPtr, *StMMO);
+    }
+    MI.eraseFromParent();
+    return true;
+  }
+  case Intrinsic::memset_inline: {
+    // The IRTranslator does not turn llvm.memset.inline into a generic memory
+    // opcode. The length is an immediate. The destination alignment is not
+    // known here, so expand to byte stores.
+    const LLT S32 = LLT::scalar(32);
+    const LLT P0 = LLT::pointer(0, 32);
+    Register Dst = MI.getOperand(1).getReg();
+    Register Val = MI.getOperand(2).getReg();
+    auto Len = getIConstantVRegValWithLookThrough(MI.getOperand(3).getReg(),
+                                                  MRI);
+    if (!Len)
+      return false;
+    MIRBuilder.setInstrAndDebugLoc(MI);
+    Register Val32 = MIRBuilder.buildZExt(S32, Val).getReg(0);
+    uint64_t N = Len->Value.getZExtValue();
+    for (uint64_t Off = 0; Off < N; ++Off) {
+      Register Ptr = Dst;
+      if (Off)
+        Ptr = MIRBuilder.buildPtrAdd(P0, Dst, MIRBuilder.buildConstant(S32, Off))
+                  .getReg(0);
+      auto *StMMO = MF.getMachineMemOperand(MachinePointerInfo(),
+                                            MachineMemOperand::MOStore,
+                                            LLT::scalar(8), Align(1));
+      MIRBuilder.buildStore(Val32, Ptr, *StMMO);
     }
     MI.eraseFromParent();
     return true;
