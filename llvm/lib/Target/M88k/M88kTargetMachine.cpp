@@ -22,7 +22,10 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCSectionELF.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/TargetRegistry.h"
@@ -110,8 +113,26 @@ std::string computeDataLayout(const Triple &TT, StringRef CPU, StringRef FS) {
   return Ret;
 }
 
-// TODO: Check.
+// Jump tables hold absolute block addresses. In position independent code they
+// need dynamic relocations, so they cannot live in a read-only section.
+class M88kTargetObjectFile : public TargetLoweringObjectFileELF {
+  MCSection *getSectionForJumpTable(const Function &F,
+                                    const TargetMachine &TM) const override {
+    return getSectionForJumpTable(F, TM, /*JTE=*/nullptr);
+  }
+  MCSection *
+  getSectionForJumpTable(const Function &F, const TargetMachine &TM,
+                         const MachineJumpTableEntry *JTE) const override {
+    if (TM.isPositionIndependent())
+      return getContext().getELFSection(".data.rel.ro", ELF::SHT_PROGBITS,
+                                        ELF::SHF_ALLOC | ELF::SHF_WRITE);
+    return TargetLoweringObjectFileELF::getSectionForJumpTable(F, TM, JTE);
+  }
+};
+
 Reloc::Model getEffectiveRelocModel(std::optional<Reloc::Model> RM) {
+  // PIC and PIE are position independent (GOT based, see
+  // M88kInstructionSelector). Everything else is static code.
   if (!RM || *RM == Reloc::DynamicNoPIC)
     return Reloc::Static;
   return *RM;
@@ -130,7 +151,7 @@ M88kTargetMachine::M88kTargetMachine(const Target &T, const Triple &TT,
                                Options, getEffectiveRelocModel(RM),
                                getEffectiveCodeModel(CM, CodeModel::Medium),
                                OL),
-      TLOF(std::make_unique<TargetLoweringObjectFileELF>()) {
+      TLOF(std::make_unique<M88kTargetObjectFile>()) {
   initAsmInfo();
 
   // Only GlobalISel is implemented. Disable the fallback mode, because there is

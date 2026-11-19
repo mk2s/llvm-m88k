@@ -14,6 +14,7 @@
 #include "M88kMCInstLower.h"
 #include "M88kSubtarget.h"
 #include "MCTargetDesc/M88kInstPrinter.h"
+#include "MCTargetDesc/M88kMCAsmInfo.h"
 #include "MCTargetDesc/M88kMCTargetDesc.h"
 #include "TargetInfo/M88kTargetInfo.h"
 #include "llvm/CodeGen/AsmPrinter.h"
@@ -22,6 +23,7 @@
 #include "llvm/IR/Mangler.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstBuilder.h"
 #include "llvm/MC/MCStreamer.h"
@@ -100,6 +102,31 @@ void M88kAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
     MCInst LoweredMI;
     switch (I->getOpcode()) {
+    case M88k::GETGOT: {
+      // GOT base: the address of .Lpc is in %r1 after the bsr.n; the
+      // delay slot instruction adds the low half of GOT - .Lpc.
+      MCContext &Ctx = OutContext;
+      MCSymbol *Lpc = Ctx.createTempSymbol();
+      const MCExpr *Ref = MCSymbolRefExpr::create(Lpc, Ctx);
+      const MCExpr *Hi = MCSpecifierExpr::create(Ref, M88k::S_ABDIFF_HI, Ctx);
+      const MCExpr *Lo = MCSpecifierExpr::create(Ref, M88k::S_ABDIFF_LO, Ctx);
+      MCRegister Dst = I->getOperand(0).getReg();
+      EmitToStreamer(*OutStreamer, MCInstBuilder(M88k::ORriu)
+                                       .addReg(Dst)
+                                       .addReg(M88k::R0)
+                                       .addExpr(Hi));
+      EmitToStreamer(*OutStreamer, MCInstBuilder(M88k::BSRn).addExpr(Ref));
+      EmitToStreamer(*OutStreamer, MCInstBuilder(M88k::ORri)
+                                       .addReg(Dst)
+                                       .addReg(Dst)
+                                       .addExpr(Lo));
+      OutStreamer->emitLabel(Lpc);
+      EmitToStreamer(*OutStreamer, MCInstBuilder(M88k::ADDUrr)
+                                       .addReg(Dst)
+                                       .addReg(Dst)
+                                       .addReg(M88k::R1));
+      continue;
+    }
     default:
       M88kMCInstLower Lower(MF->getContext(), *this);
       Lower.lower(&*I, LoweredMI);

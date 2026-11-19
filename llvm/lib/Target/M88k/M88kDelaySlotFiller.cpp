@@ -224,6 +224,9 @@ bool M88kDelaySlotFiller::delayHasHazard(MachineBasicBlock::instr_iterator MI,
                                          SmallSet<unsigned, 32> &RegUses) {
   if (MI->isImplicitDef() || MI->isKill())
     return true;
+  // Expands to a branch sequence of its own.
+  if (MI->getOpcode() == M88k::GETGOT)
+    return true;
 
   // Loads or stores cannot be moved past a store to the delay slot
   // and stores cannot be moved past a load.

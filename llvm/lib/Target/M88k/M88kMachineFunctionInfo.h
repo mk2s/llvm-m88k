@@ -14,6 +14,7 @@
 #define LLVM_LIB_TARGET_M88K_M88KMACHINEFUNCTIONINFO_H
 
 #include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/Register.h"
 
 namespace llvm {
 
@@ -37,6 +38,9 @@ class M88kMachineFunctionInfo : public MachineFunctionInfo {
   /// FrameIndex for start of argument area.
   int StackIndex = 0;
 
+  /// Virtual register holding the GOT base in position independent code.
+  Register GlobalBaseReg;
+
 public:
   M88kMachineFunctionInfo(const Function &F, const TargetSubtargetInfo *STI) {}
 
@@ -59,6 +63,9 @@ public:
 
   int getStackIndex() const { return StackIndex; }
   void setStackIndex(int Idx) { StackIndex = Idx; }
+
+  Register getGlobalBaseReg() const { return GlobalBaseReg; }
+  void setGlobalBaseReg(Register Reg) { GlobalBaseReg = Reg; }
 };
 } // end namespace llvm
 

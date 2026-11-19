@@ -12,6 +12,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/bit.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
@@ -70,6 +71,12 @@ uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value,
     // %lo16: the lower 16 bits of the (32-bit) target value.
     return Value & 0xffff;
 
+  case M88k::FK_88K_GOT_HI:
+  case M88k::FK_88K_GOT_LO:
+  case M88k::FK_88K_ABDIFF_HI:
+  case M88k::FK_88K_ABDIFF_LO:
+    // The value is only known to the linker; the field stays zero.
+    return 0;
   case M88k::FK_88K_NONE:
     return 0;
   }
@@ -128,7 +135,11 @@ MCFixupKindInfo M88kMCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
       {"FK_88K_DISP16", 16, 16, 0},
       {"FK_88K_DISP26", 6, 26, 0},
       {"FK_88K_HI", 0, 16, 0},
-      {"FK_88K_LO", 0, 16, 0}};
+      {"FK_88K_LO", 0, 16, 0},
+      {"FK_88K_GOT_HI", 0, 16, 0},
+      {"FK_88K_GOT_LO", 0, 16, 0},
+      {"FK_88K_ABDIFF_HI", 0, 16, 0},
+      {"FK_88K_ABDIFF_LO", 0, 16, 0}};
 
   if (Kind < FirstTargetFixupKind)
     return MCAsmBackend::getFixupKindInfo(Kind);
@@ -144,6 +155,10 @@ void M88kMCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
   MCFixupKind Kind = Fixup.getKind();
   // Branch displacements always get a relocation.
   if (Kind == M88k::FK_88K_DISP16 || Kind == M88k::FK_88K_DISP26)
+    IsResolved = false;
+  // GOT-relative relocations are always resolved by the linker.
+  if (Kind == M88k::FK_88K_GOT_HI || Kind == M88k::FK_88K_GOT_LO ||
+      Kind == M88k::FK_88K_ABDIFF_HI || Kind == M88k::FK_88K_ABDIFF_LO)
     IsResolved = false;
   maybeAddReloc(F, Fixup, Target, Value, IsResolved);
   if (mc::isRelocation(Kind))
@@ -184,7 +199,7 @@ MCAsmBackend *llvm::createM88kMCAsmBackend(const Target &T,
                                            const MCSubtargetInfo &STI,
                                            const MCRegisterInfo &MRI,
                                            const MCTargetOptions &Options) {
-  uint8_t OSABI =
-      MCELFObjectTargetWriter::getOSABI(STI.getTargetTriple().getOS());
-  return new M88kMCAsmBackend(OSABI);
+  // Every OpenBSD m88k binary uses ELFOSABI_NONE; OpenBSD is identified by
+  // .note.openbsd.ident instead.
+  return new M88kMCAsmBackend(ELF::ELFOSABI_NONE);
 }

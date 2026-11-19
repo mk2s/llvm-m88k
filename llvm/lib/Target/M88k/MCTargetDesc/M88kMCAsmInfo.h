@@ -25,7 +25,15 @@ public:
 
 namespace M88k {
 using Specifier = uint8_t;
-enum { S_None, S_ABS_HI, S_ABS_LO };
+enum {
+  S_None,
+  S_ABS_HI,
+  S_ABS_LO,
+  S_GOT_HI,
+  S_GOT_LO,
+  S_ABDIFF_HI,
+  S_ABDIFF_LO
+};
 } // namespace M88k
 
 } // end namespace llvm

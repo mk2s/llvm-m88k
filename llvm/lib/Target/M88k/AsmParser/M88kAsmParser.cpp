@@ -599,7 +599,8 @@ bool M88kAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
     const AsmToken &Next = Lexer.peekTok();
     if (Next.is(AsmToken::Identifier)) {
       StringRef Id = Next.getIdentifier();
-      if (Id == "hi16" || Id == "lo16") {
+      if (Id == "hi16" || Id == "lo16" || Id == "got_hi16" ||
+          Id == "got_lo16" || Id == "abdiff_hi16" || Id == "abdiff_lo16") {
         Parser.Lex(); // Eat '%'.
         return parseRelocExpr(Operands, PercentLoc);
       }
@@ -669,6 +670,10 @@ bool M88kAsmParser::parseRelocExpr(OperandVector &Operands, SMLoc PercentLoc) {
   M88k::Specifier Kind = StringSwitch<M88k::Specifier>(Id)
                              .Case("hi16", M88k::S_ABS_HI)
                              .Case("lo16", M88k::S_ABS_LO)
+                             .Case("got_hi16", M88k::S_GOT_HI)
+                             .Case("got_lo16", M88k::S_GOT_LO)
+                             .Case("abdiff_hi16", M88k::S_ABDIFF_HI)
+                             .Case("abdiff_lo16", M88k::S_ABDIFF_LO)
                              .Default(M88k::S_None);
   if (Kind == M88k::S_None)
     return Error(PercentLoc, "unknown relocation specifier");

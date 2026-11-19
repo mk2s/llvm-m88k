@@ -54,6 +54,9 @@ public:
   bool isCheapToSpeculateCtlz(Type *Ty) const override;
   bool isCheapToSpeculateCttz(Type *Ty) const override;
   bool isCtlzFast() const override;
+  // Jump table entries are absolute block addresses, also in PIC code (they
+  // end up in .data.rel.ro and get BBASED_32 relocations).
+  unsigned getJumpTableEncoding() const override;
   Register getRegisterByName(const char *RegName, LLT Ty,
                              const MachineFunction &MF) const override;
   std::pair<unsigned, const TargetRegisterClass *>

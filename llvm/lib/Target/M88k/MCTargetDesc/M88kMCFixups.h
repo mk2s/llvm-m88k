@@ -20,6 +20,10 @@ enum FixupKind {
   FK_88K_DISP26, // R_88K_DISP26
   FK_88K_HI, // R_88K_16H = upper 16-bits of a symbolic relocation
   FK_88K_LO, // R_88K_16H = lower 16-bits of a symbolic relocation
+  FK_88K_GOT_HI, // R_88K_GOT_16H = upper half of GOT entry offset
+  FK_88K_GOT_LO, // R_88K_GOT_16L = lower half of GOT entry offset
+  FK_88K_ABDIFF_HI, // R_88K_ABDIFF_16H = upper half of GOT - (sym + addend)
+  FK_88K_ABDIFF_LO, // R_88K_ABDIFF_16L = lower half of GOT - (sym + addend)
 
   // Marker
   LastTargetFixupKind,

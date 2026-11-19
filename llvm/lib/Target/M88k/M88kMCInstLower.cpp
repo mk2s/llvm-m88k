@@ -41,6 +41,18 @@ MCOperand M88kMCInstLower::lowerSymbolOperand(const MachineOperand &MO) const {
   case M88kII::MO_ABS_LO:
     TargetKind = M88k::S_ABS_LO;
     break;
+  case M88kII::MO_GOT_HI:
+    TargetKind = M88k::S_GOT_HI;
+    break;
+  case M88kII::MO_GOT_LO:
+    TargetKind = M88k::S_GOT_LO;
+    break;
+  case M88kII::MO_ABDIFF_HI:
+    TargetKind = M88k::S_ABDIFF_HI;
+    break;
+  case M88kII::MO_ABDIFF_LO:
+    TargetKind = M88k::S_ABDIFF_LO;
+    break;
   }
 
   switch (MO.getType()) {

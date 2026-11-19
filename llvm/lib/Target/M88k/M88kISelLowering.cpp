@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/Register.h"
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/CodeGenTypes/LowLevelType.h"
@@ -57,6 +58,10 @@ bool M88kTargetLowering::isCheapToSpeculateCtlz(Type *Ty) const { return true; }
 
 bool M88kTargetLowering::isCheapToSpeculateCttz(Type *Ty) const { return true; }
 bool M88kTargetLowering::isCtlzFast() const { return true; }
+
+unsigned M88kTargetLowering::getJumpTableEncoding() const {
+  return MachineJumpTableInfo::EK_BlockAddress;
+}
 
 bool M88kTargetLowering::isSelectSupported(SelectSupportKind /*kind*/) const {
   // No kind of select is supported.

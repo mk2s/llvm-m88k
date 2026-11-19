@@ -51,6 +51,18 @@ unsigned M88kObjectWriter::getRelocType(const MCFixup &Fixup,
   case M88k::FK_88K_LO:
     Type = ELF::R_88K_16L;
     break;
+  case M88k::FK_88K_GOT_HI:
+    Type = ELF::R_88K_GOT_16H;
+    break;
+  case M88k::FK_88K_GOT_LO:
+    Type = ELF::R_88K_GOT_16L;
+    break;
+  case M88k::FK_88K_ABDIFF_HI:
+    Type = ELF::R_88K_ABDIFF_16H;
+    break;
+  case M88k::FK_88K_ABDIFF_LO:
+    Type = ELF::R_88K_ABDIFF_16L;
+    break;
   case M88k::FK_88K_DISP16:
     Type = ELF::R_88K_DISP16;
     break;

@@ -93,6 +93,9 @@ private:
 
   bool selectVaStart(MachineInstr &I, MachineBasicBlock &MBB,
                      MachineRegisterInfo &MRI) const;
+  /// Return the virtual register holding the GOT base (PIC), creating the
+  /// GETGOT instruction in the entry block on first use.
+  Register getGlobalBaseReg(MachineFunction &MF) const;
   bool selectGlobalValue(MachineInstr &I, MachineBasicBlock &MBB,
                          MachineRegisterInfo &MRI) const;
   bool selectSExtInreg(MachineInstr &I, MachineBasicBlock &MBB,
@@ -353,8 +356,9 @@ M88kInstructionSelector::selectAddrRegImm(MachineOperand &Root) const {
 
   MachineInstr *RootDef = getDefIgnoringCopies(Root.getReg(), MRI);
 
-  // Match load from global address.
-  if (RootDef->getOperand(1).isGlobal()) {
+  // Match load from global address. Under PIC the address comes from the GOT
+  // and is matched as a plain register below.
+  if (!TM.isPositionIndependent() && RootDef->getOperand(1).isGlobal()) {
     Register AddrReg = MRI.createVirtualRegister(&M88k::GPRRegClass);
     return {{
         [=](MachineInstrBuilder &MIB) {
@@ -483,12 +487,38 @@ bool M88kInstructionSelector::selectVaStart(MachineInstr &I,
   I.eraseFromParent();
   return true;
 }
+Register M88kInstructionSelector::getGlobalBaseReg(MachineFunction &MF) const {
+  M88kMachineFunctionInfo *FuncInfo = MF.getInfo<M88kMachineFunctionInfo>();
+  Register GlobalBase = FuncInfo->getGlobalBaseReg();
+  if (GlobalBase)
+    return GlobalBase;
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  MachineBasicBlock &EntryMBB = MF.front();
+  GlobalBase = MRI.createVirtualRegister(&M88k::GPRRegClass);
+  // GCC keeps the GOT base in %r25; prefer it.
+  MRI.setSimpleHint(GlobalBase, M88k::R25);
+  BuildMI(EntryMBB, EntryMBB.begin(), DebugLoc(), TII.get(M88k::GETGOT),
+          GlobalBase);
+  // GETGOT clobbers %r1, so the function must save it.
+  MF.getFrameInfo().setHasCalls(true);
+  FuncInfo->setGlobalBaseReg(GlobalBase);
+  return GlobalBase;
+}
+
 bool M88kInstructionSelector::selectGlobalValue(
     MachineInstr &I, MachineBasicBlock &MBB, MachineRegisterInfo &MRI) const {
   assert(I.getOpcode() == TargetOpcode::G_GLOBAL_VALUE && "Unexpected G code");
-
   const GlobalValue *GV = I.getOperand(1).getGlobal();
-
+  if (TM.isPositionIndependent()) {
+    // Load the address from the GOT: ld %d,%gotbase,%got_lo16(GV)
+    Register GotBase = getGlobalBaseReg(*MBB.getParent());
+    MachineInstr *LdMI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::LDriw))
+                             .add(I.getOperand(0))
+                             .addReg(GotBase)
+                             .addGlobalAddress(GV, 0, M88kII::MO_GOT_LO);
+    I.eraseFromParent();
+    return constrainSelectedInstRegOperands(*LdMI, MRI, TII, TRI, RBI);
+  }
   Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
   MachineInstr *MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ORriu))
                          .addReg(Temp, RegState::Define)
@@ -869,7 +899,16 @@ bool M88kInstructionSelector::selectJumpTable(MachineInstr &I,
   MachineInstr *MI = nullptr;
   Register Reg = I.getOperand(0).getReg();
   int JTIndex = I.getOperand(1).getIndex();
-
+  if (TM.isPositionIndependent()) {
+    // The table address comes from the GOT like any other local symbol.
+    Register GotBase = getGlobalBaseReg(*MBB.getParent());
+    MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::LDriw))
+             .addReg(Reg, RegState::Define)
+             .addReg(GotBase)
+             .addJumpTableIndex(JTIndex, M88kII::MO_GOT_LO);
+    I.eraseFromParent();
+    return constrainSelectedInstRegOperands(*MI, MRI, TII, TRI, RBI);
+  }
   Register Temp = MRI.createVirtualRegister(&M88k::GPRRegClass);
   MI = BuildMI(MBB, I, I.getDebugLoc(), TII.get(M88k::ORriu))
            .addReg(Temp, RegState::Define)

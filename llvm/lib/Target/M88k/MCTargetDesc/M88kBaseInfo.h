@@ -30,7 +30,15 @@ enum TOF {
   // MO_ABS_HI/LO - Represents the hi or low part of an absolute symbol
   // address.
   MO_ABS_HI = 0x1,
-  MO_ABS_LO = 0x2
+  MO_ABS_LO = 0x2,
+  // MO_GOT_HI/LO - hi or low half of the offset of the GOT entry of a symbol
+  // from the GOT base (R_88K_GOT_16H/16L).
+  MO_GOT_HI = 0x3,
+  MO_GOT_LO = 0x4,
+  // MO_ABDIFF_HI/LO - hi or low half of GOT - (sym + addend)
+  // (R_88K_ABDIFF_16H/16L), used to compute the GOT base from a label.
+  MO_ABDIFF_HI = 0x5,
+  MO_ABDIFF_LO = 0x6
 };
 } // end namespace M88kII
 

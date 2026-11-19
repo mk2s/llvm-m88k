@@ -88,9 +88,13 @@ register. Test: `llvm/test/CodeGen/M88k/inline-asm-mem.ll`.
   knows the target OS, and searching versioned names on every OS would change Linux behaviour.
   Without an unversioned `libc.so` in a `-L` directory lld silently links `libc.a` (static).
   Workaround: `m88k-baremetal/openbsd-userland/run.sh` creates `libc.so`/`libm.so` links.
-- Only non-PIE executables. The backend does not generate PIC, so lld has no support for PIE or
-  shared libraries (`R_88K_GOT_*`, `R_88K_PLT_16*`, ... relocations), and `-fPIE -pie` is accepted
-  by the driver but does not produce working code.
+- PIC (`-relocation-model=pic`, `-fPIC`) is GOT based: each function that needs the GOT computes its
+  base in a register (hinted to `%r25`) with GCC's `or.u/bsr.n/or/addu %r1` prologue
+  (`R_88K_ABDIFF_16H/16L`), globals and function addresses load from `%got_lo16(sym)`
+  (`R_88K_GOT_16L`, GOT offsets above 64 KiB are not supported), jump tables are absolute and live in
+  `.data.rel.ro`. The local `bsr.n` of the prologue still carries a `R_88K_DISP26` against `.text`.
+  Not PIC safe yet: indirect branch relaxation (`insertIndirectBranch`) and `LOAD_STACK_GUARD` use
+  absolute `%hi16/%lo16` addresses. lld support for shared objects and these relocations is separate.
 - Calls to an undefined weak symbol (e.g. `_Jv_RegisterClasses` from OpenBSD's `crtbegin.o`) get an
   unused PLT entry and `.rela.plt` relocation. GNU ld omits them; ld.so skips the missing symbol, so
   this is harmless (lld does the same on other targets).

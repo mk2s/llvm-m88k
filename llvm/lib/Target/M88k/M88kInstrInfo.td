@@ -911,6 +911,12 @@ let isReturn = 1, isTerminator = 1, isBarrier = 1, Opcode = "RET" in {
   def RET : Pseudo<(outs), (ins), []>;
 }
 
+// Compute the GOT base address (PIC). Expanded in M88kAsmPrinter to
+//   or.u %d,%r0,%abdiff_hi16(.Lpc); bsr.n .Lpc; or %d,%d,%abdiff_lo16(.Lpc)
+//   .Lpc: addu %d,%d,%r1
+let Defs = [R1], hasSideEffects = 1, mayLoad = 0, mayStore = 0, Size = 16 in {
+  def GETGOT : Pseudo<(outs GPROpnd:$dst), (ins), []>;
+}
 // Dynamic stack allocation, expanded in M88kFrameLowering after the size of
 // the outgoing argument area is known.
 let Defs = [R31], Uses = [R31], hasSideEffects = 1, mayLoad = 0,

@@ -98,6 +98,14 @@ static M88k::FixupKind fixupKind(const MCExpr *Expr) {
       return M88k::FK_88K_HI;
     case M88k::S_ABS_LO:
       return M88k::FK_88K_LO;
+    case M88k::S_GOT_HI:
+      return M88k::FK_88K_GOT_HI;
+    case M88k::S_GOT_LO:
+      return M88k::FK_88K_GOT_LO;
+    case M88k::S_ABDIFF_HI:
+      return M88k::FK_88K_ABDIFF_HI;
+    case M88k::S_ABDIFF_LO:
+      return M88k::FK_88K_ABDIFF_LO;
     }
   }
   // Any other expression (e.g. 0xffff & (sym - . - 4), accepted in GNU

@@ -46,6 +46,18 @@ void M88kMCAsmInfo::printSpecifierExpr(raw_ostream &OS,
   case M88k::S_ABS_LO:
     OS << "%lo16";
     break;
+  case M88k::S_GOT_HI:
+    OS << "%got_hi16";
+    break;
+  case M88k::S_GOT_LO:
+    OS << "%got_lo16";
+    break;
+  case M88k::S_ABDIFF_HI:
+    OS << "%abdiff_hi16";
+    break;
+  case M88k::S_ABDIFF_LO:
+    OS << "%abdiff_lo16";
+    break;
   }
   OS << '(';
   printExpr(OS, *Expr.getSubExpr());

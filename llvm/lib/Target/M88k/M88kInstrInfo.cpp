@@ -71,6 +71,10 @@ M88kInstrInfo::getSerializableDirectMachineOperandTargetFlags() const {
   static const std::pair<unsigned, const char *> Flags[] = {
       {MO_ABS_HI, "m88k-abs-hi"},
       {MO_ABS_LO, "m88k-abs-lo"},
+      {MO_GOT_HI, "m88k-got-hi"},
+      {MO_GOT_LO, "m88k-got-lo"},
+      {MO_ABDIFF_HI, "m88k-abdiff-hi"},
+      {MO_ABDIFF_LO, "m88k-abdiff-lo"},
   };
   return ArrayRef(Flags);
 }
