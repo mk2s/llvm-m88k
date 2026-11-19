@@ -1413,7 +1413,12 @@ DynamicSection<ELFT>::computeContents() {
   if (ctx.arg.pie)
     dtFlags1 |= DF_1_PIE;
   if (ctx.arg.zNow) {
-    dtFlags |= DF_BIND_NOW;
+    // OpenBSD's ld.so only looks at the DT_BIND_NOW tag (and DT_FLAGS_1), not
+    // at DT_FLAGS.
+    if (ctx.arg.emachine == EM_88K)
+      addInt(DT_BIND_NOW, 0);
+    else
+      dtFlags |= DF_BIND_NOW;
     dtFlags1 |= DF_1_NOW;
   }
   if (ctx.arg.zOrigin) {

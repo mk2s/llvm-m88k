@@ -554,6 +554,12 @@ template <class ELFT> void Writer<ELFT>::addSectionSymbols() {
 }
 
 // Returns true if this is a variant of .data.rel.ro.
+// OpenBSD m88k binaries have EI_OSABI 0, but still use the OpenBSD program
+// headers and .openbsd.randomdata.
+static bool isOpenBSDFlavor(Ctx &ctx) {
+  return ctx.arg.osabi == ELFOSABI_OPENBSD || ctx.arg.emachine == EM_88K;
+}
+
 static bool isRelRoDataSection(Ctx &ctx, StringRef secName) {
   if (!secName.consume_front(".data.rel.ro"))
     return false;
@@ -609,8 +615,10 @@ static bool isRelroSection(Ctx &ctx, const OutputSection *sec) {
   // .got contains pointers to external symbols. They are resolved by
   // the dynamic linker when a module is loaded into memory, and after
   // that they are not expected to change. So, it can be in RELRO.
+  // On M88k .got must directly follow .got.plt (GOT entries are addressed with
+  // unsigned 16-bit offsets from .got.plt), so both are in or out of RELRO.
   if (ctx.in.got && sec == ctx.in.got->getParent())
-    return true;
+    return ctx.arg.emachine != EM_88K || ctx.arg.zNow;
 
   // .toc is a GOT-ish section for PowerPC64. Their contents are accessed
   // through r2 register, which is reserved for that purpose. Since r2 is used
@@ -648,7 +656,7 @@ static bool isRelroSection(Ctx &ctx, const OutputSection *sec) {
                      s == ".init_array" || s == ".preinit_array";
 
   bool abiSpecific =
-      ctx.arg.osabi == ELFOSABI_OPENBSD && s == ".openbsd.randomdata";
+      isOpenBSDFlavor(ctx) && s == ".openbsd.randomdata";
 
   return abiAgnostic || abiSpecific;
 }
@@ -783,6 +791,14 @@ unsigned elf::getSectionRank(Ctx &ctx, OutputSection &osec) {
       rank |= 2;
   }
 
+  // M88k GOT entries are addressed relative to .got.plt, so .got must follow
+  // .got.plt immediately.
+  if (ctx.arg.emachine == EM_88K) {
+    if (osec.name == ".got.plt")
+      rank |= 1;
+    else if (osec.name == ".got")
+      rank |= 2;
+  }
   if (ctx.arg.emachine == EM_MIPS) {
     if (osec.name != ".got")
       rank |= 1;
@@ -2463,7 +2479,7 @@ Writer<ELFT>::createPhdrs(Partition &part) {
     addHdr(PT_GNU_EH_FRAME, part.ehFrameHdr->getParent()->getPhdrFlags())
         ->add(part.ehFrameHdr->getParent());
 
-  if (ctx.arg.osabi == ELFOSABI_OPENBSD) {
+  if (isOpenBSDFlavor(ctx)) {
     // PT_OPENBSD_MUTABLE makes the dynamic linker fill the segment with
     // zero data, like bss, but it can be treated differently.
     if (OutputSection *cmd = findSection(ctx, ".openbsd.mutable", partNo))

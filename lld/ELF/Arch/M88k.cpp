@@ -19,6 +19,15 @@
 //   R_88K_DISP16   (S + A - P) >> 2         (16-bit word displacement)
 //   R_88K_DISP26   (S + A - P) >> 2         (26-bit word displacement, br/bsr)
 //   R_88K_PLT_DISP26 (L + A - P) >> 2       (same as DISP26)
+//   R_88K_ABDIFF_16H/16L  halves of GOT - (S + A)
+//   R_88K_GOT_16H/16L     halves of (offset of the GOT entry of S from the GOT
+//                         base); 16L must fit in 16 bits, the GOT is small
+//
+// The GOT base is .got.plt (DT_PLTGOT, _GLOBAL_OFFSET_TABLE_), as with GNU ld
+// where .got.plt and .got are one section. lld places .got right after
+// .got.plt so GOT entries have offsets in [0, 0xffff] from the base.
+// ABDIFF is used by the GETGOT prologue:  or.u %r25,%r0,hi16(.Lpc#abdiff) ;
+// bsr.n .Lpc ; or %r25,%r25,lo16(.Lpc#abdiff) ; .Lpc: addu %r25,%r25,%r1.
 //
 // DISP26 and PLT_DISP26 go through the PLT when the target is in a DSO.
 //
@@ -88,6 +97,7 @@ M88k::M88k(Ctx &ctx) : TargetInfo(ctx) {
   relativeRel = R_88K_BBASED_32;
   symbolicRel = R_88K_32;
   gotPltHeaderEntriesNum = 3;
+  gotBaseSymInGotPlt = true;
   pltHeaderSize = 72;
   pltEntrySize = 24;
 }
@@ -109,6 +119,12 @@ RelExpr M88k::getRelExpr(RelType type, const Symbol &s,
   case R_88K_DISP26:
   case R_88K_PLT_DISP26:
     return R_PLT_PC;
+  case R_88K_ABDIFF_16H:
+  case R_88K_ABDIFF_16L:
+    return R_GOTPLTREL;
+  case R_88K_GOT_16H:
+  case R_88K_GOT_16L:
+    return R_GOTPLT;
   default:
     Err(ctx) << getErrorLoc(ctx, loc) << "unknown relocation (" << type.v
              << ") against symbol " << &s;
@@ -130,6 +146,20 @@ void M88k::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
     write16be(loc, (val >> 16) & 0xffff);
     break;
   case R_88K_16L:
+    write16be(loc, val & 0xffff);
+    break;
+  case R_88K_ABDIFF_16H:
+    // val is S + A - GOT; the relocation computes GOT - (S + A).
+    write16be(loc, (-val >> 16) & 0xffff);
+    break;
+  case R_88K_ABDIFF_16L:
+    write16be(loc, -val & 0xffff);
+    break;
+  case R_88K_GOT_16H:
+    write16be(loc, (val >> 16) & 0xffff);
+    break;
+  case R_88K_GOT_16L:
+    checkUInt(ctx, loc, val, 16, rel);
     write16be(loc, val & 0xffff);
     break;
   case R_88K_DISP16: {
