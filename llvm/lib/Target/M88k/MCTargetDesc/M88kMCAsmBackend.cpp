@@ -184,8 +184,11 @@ bool M88kMCAsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
 
 bool M88kMCAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,
                                     const MCSubtargetInfo *STI) const {
-  if ((Count % 4) != 0)
-    return false;
+  // Alignment padding may start at a non-word boundary (for example after
+  // .byte or .asciz data in an executable section).  Fill the bytes up to the
+  // next word boundary with zeros and the rest with nops.
+  for (uint64_t I = 0; I != Count % 4; ++I)
+    OS.write("\0", 1);
 
   // or %r0,%r0,%r0.  Write whole words; streaming a C string would stop at
   // the embedded NUL.
